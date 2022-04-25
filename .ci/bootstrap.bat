@@ -3,8 +3,12 @@ SETLOCAL ENABLEEXTENSIONS ENABLEDELAYEDEXPANSION
 
 cd internal\c
 set MINGW=mingw32
+set OTHER_MINGW=mingw64
 IF "%PLATFORM%"=="x64" set MINGW=mingw64
+IF "%PLATFORM%"=="x64" set OTHER_MINGW=mingw32
 ren %MINGW% c_compiler
+
+rmdir /s /q %OTHER_MINGW%
 cd ../..
 
 echo Building library 'LibQB'
