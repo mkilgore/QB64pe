@@ -1,5 +1,7 @@
 # QB64
 
+![CI](https://github.com/QB64-Phoenix-Edition/QB64pe/actions/workflows/CI.yml/badge.svg)
+
 ![githubstrip](https://avatars.githubusercontent.com/u/104205737?s=200&v=4)
 
 
