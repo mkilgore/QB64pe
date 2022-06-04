@@ -7,6 +7,7 @@ on:
   push:
     branches:
       - 'main'
+      - 'add-curl'
     tags:
       - 'v*'
 
@@ -39,6 +40,10 @@ jobs:
       with:
         fetch-depth: 0
 
+    - name: Curl version
+      if: ${{ matrix.os == 'macos-latest' }}
+      run: cat /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/lib/libcurl.tbd
+
       # A deploy key is setup so that the potential push of ./internal/source can
       # trigger a new build. Care is taken to make sure loops cannot happen.
     - uses: webfactory/ssh-agent@v0.5.4
@@ -48,7 +53,7 @@ jobs:
 
     - name: Install dependencies
       if: ${{ matrix.os == 'ubuntu-latest' }}
-      run: sudo apt update && sudo apt install build-essential x11-utils mesa-common-dev libglu1-mesa-dev libasound2-dev zlib1g-dev
+      run: sudo apt update && sudo apt install build-essential x11-utils mesa-common-dev libglu1-mesa-dev libasound2-dev zlib1g-dev libcurl4-openssl-dev
 
     - name: Calculate Version
       shell: bash
@@ -62,13 +67,20 @@ jobs:
       if: ${{ matrix.os == 'windows-latest' }}
       run: .ci/bootstrap.bat
 
+    - name: Print QB64 Bootstrap Version
+      run: ./qb64_bootstrap -?
+
     - name: Compile Linux/OSX
       if: ${{ matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest' }}
-      run: .ci/compile.sh
+      run: .ci/compile.sh ${{ matrix.prefix }}
 
     - name: Compile Windows
       if: ${{ matrix.os == 'windows-latest' }}
       run: .ci/compile.bat
+
+    - name: Test libqb
+      shell: bash
+      run: tests/run_c_tests.sh
 
     - name: Print QB64 Version
       run: ./qb64 -?
