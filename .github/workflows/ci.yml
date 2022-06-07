@@ -40,6 +40,11 @@ jobs:
       with:
         fetch-depth: 0
 
+    - uses: maxim-lobanov/setup-xcode@v1
+      if: ${{ matrix.os == 'macos-latest' }}
+      with:
+        xcode-version: '11.7.0' # MacOS 10.15 Catalina
+
     - name: Curl version
       if: ${{ matrix.os == 'macos-latest' }}
       run: cat /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/lib/libcurl.tbd
