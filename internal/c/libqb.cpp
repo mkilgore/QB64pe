@@ -713,6 +713,11 @@ struct special_handle_struct {
 };
 list *special_handles = NULL;
 
+enum class stream_type {
+    Tcp,
+    Http,
+};
+
 // Stream system
 //-------------
 // Purpose: Unify access to the input and/or output of streamed data
@@ -723,7 +728,7 @@ struct stream_struct {
     int8 eof;          // user attempted to read past end of stream
     // Note: 'out' is unrequired because data can be sent directly to the interface
     //-----------------------------------------
-    int8 type;
+    stream_type type;
     // 1=Network (TCP)
     ptrszint index; // an index or pointer to the type's object
 };
@@ -17695,7 +17700,7 @@ void sub_close(int32 i2, int32 passed) {
             if (sh->type == 1) { // stream
                 static stream_struct *st;
                 st = (stream_struct *)sh->index;
-                if (st->type == 1) { // connection
+                if (st->type == stream_type::Tcp) { // connection
                     connection_close(x);
                 } // connection
             }     // stream
@@ -28816,7 +28821,7 @@ struct connection_struct {
 list *connection_handles = NULL;
 
 void stream_out(stream_struct *st, void *offset, ptrszint bytes) {
-    if (st->type == 1) { // Network
+    if (st->type == stream_type::Tcp) { // Network
         static connection_struct *co;
         co = (connection_struct *)st->index;
         if ((co->type == 1) || (co->type == 3)) { // client or host's connection from a client
@@ -28892,7 +28897,7 @@ void connection_close(ptrszint i) {
     if (sh->type == 1) { // stream
         static stream_struct *ss;
         ss = (stream_struct *)sh->index;
-        if (ss->type == 1) { // network
+        if (ss->type == stream_type::Tcp) { // network
             static connection_struct *cs;
             cs = (connection_struct *)ss->index;
             if (cs->protocol == 1)
@@ -28956,9 +28961,37 @@ int32 connection_new(int32 method, qbs *info_in, int32 value) {
     static int32 port;
 
     if ((method == 0) || (method == 1)) {
+        if (method == 0 && qbs_equal(qbs_ucase(info_part[1]), qbs_new_txt("HTTP"))) {
+            if (parts < 1 || parts > 2)
+                return -1;
+
+            qbs *domain = info_part[2];
+            int port = 0;
+            if (parts == 2) {
+                port = func_val(info_part[2]);
+                domain = info_part[3];
+            }
+
+            qbs_set(str, qbs_add(domain, strz));
+
+            // Handle has to be provided to http logic to open connection
+            int32 my_handle;
+            my_handle = list_add(special_handles);
+
+            int err = libqb_http_open((const char *)str->chr, my_handle);
+
+            if (err) {
+                list_remove(special_handles, my_handle);
+                // FIXME: Report error properly
+                return -1;
+            }
+
+            return my_handle;
+        }
 
         if (parts < 2)
             return -1;
+
         if (qbs_equal(qbs_ucase(info_part[1]), qbs_new_txt("TCP/IP")) == 0) {
             if (qbs_equal(qbs_ucase(info_part[1]), qbs_new_txt("QB64IDE")) == 0 || vwatch != -1) {
                 return -1;
@@ -28992,7 +29025,7 @@ int32 connection_new(int32 method, qbs *info_in, int32 value) {
             my_connection_struct = (connection_struct *)list_get(connection_handles, my_connection);
             my_handle_struct->type = 1; // stream
             my_handle_struct->index = (ptrszint)my_stream_struct;
-            my_stream_struct->type = 1; // network
+            my_stream_struct->type = stream_type::Tcp; // network
             my_stream_struct->index = (ptrszint)my_connection_struct;
             my_connection_struct->protocol = 1; // tcp/ip
             my_connection_struct->type = 1;     // client
@@ -29064,7 +29097,7 @@ int32 connection_new(int32 method, qbs *info_in, int32 value) {
         my_connection_struct = (connection_struct *)list_get(connection_handles, my_connection);
         my_handle_struct->type = 1; // stream
         my_handle_struct->index = (ptrszint)my_stream_struct;
-        my_stream_struct->type = 1; // network
+        my_stream_struct->type = stream_type::Tcp; // network
         my_stream_struct->index = (ptrszint)my_connection_struct;
         my_connection_struct->protocol = 1; // tcp/ip
         my_connection_struct->type = 3;     // host's client connection
@@ -29167,7 +29200,7 @@ qbs *func__connectionaddress(int32 i) {
         if (sh->type == 1) { // stream
             static stream_struct *ss;
             ss = (stream_struct *)sh->index;
-            if (ss->type == 1) { // network
+            if (ss->type == stream_type::Tcp) { // network
                 static connection_struct *cs;
                 cs = (connection_struct *)ss->index;
                 if (cs->protocol == 1) {                  // TCP/IP
@@ -29236,7 +29269,7 @@ int32 func__connected(int32 i) {
         if (sh->type == 1) { // stream
             static stream_struct *ss;
             ss = (stream_struct *)sh->index;
-            if (ss->type == 1) { // network
+            if (ss->type == stream_type::Tcp) { // network
                 static connection_struct *cs;
                 cs = (connection_struct *)ss->index;
                 if (cs->protocol == 1) { // TCP/IP
