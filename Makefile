@@ -314,7 +314,7 @@ ifneq ($(filter y,$(DEP_DATA)),)
 	EXE_OBJS += $(PATH_INTERNAL_TEMP)/data.o
 endif
 
-QBLIB := $(PATH_INTERNAL_C)/libqb/$(QBLIB_NAME).o
+QBLIB := $(PATH_INTERNAL_C)/$(QBLIB_NAME).o
 
 ifneq ($(OS),osx)
 $(QBLIB): $(PATH_INTERNAL_C)/libqb.cpp
