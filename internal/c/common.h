@@ -97,27 +97,7 @@
 #        endif
 #    endif
 
-// QB64 string descriptor structure
-struct qbs_field {
-    int32 fileno;
-    int64 fileid;
-    int64 size;
-    int64 offset;
-};
-
-struct qbs {
-    uint8 *chr;    // a 32 bit pointer to the string's data
-    int32 len;     // must be signed for comparisons against signed int32s
-    uint8 in_cmem; // set to 1 if in the conventional memory DBLOCK
-    uint16 *cmem_descriptor;
-    uint16 cmem_descriptor_offset;
-    uint32 listi;    // the index in the list of strings that references it
-    uint8 tmp;       // set to 1 if the string can be deleted immediately after being processed
-    uint32 tmplisti; // the index in the list of strings that references it
-    uint8 fixed;     // fixed length string
-    uint8 readonly;  // set to 1 if string is read only
-    qbs_field *field;
-};
+struct qbs;
 
 struct img_struct {
     void *lock_offset;

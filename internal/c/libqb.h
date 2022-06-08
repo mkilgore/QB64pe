@@ -28,10 +28,6 @@ int32 func__copyimage(int32 i, int32 mode, int32 passed);
 int32 func__dest();
 int32 func__display();
 void qbg_sub_view_print(int32, int32, int32);
-qbs *qbs_new(int32, uint8);
-qbs *qbs_new_txt(const char *);
-qbs *qbs_add(qbs *, qbs *);
-qbs *qbs_set(qbs *, qbs *);
 void qbg_sub_window(float, float, float, float, int32);
 extern int32 autodisplay;
 // GFS forward references
@@ -64,9 +60,6 @@ extern int32 port60h_events;
 
 extern int32 window_exists;
 extern int32 no_control_characters2;
-
-extern qbs *qbs_lcase(qbs *str);
-extern qbs *qbs_ucase(qbs *str);
 
 using namespace std;
 #endif
