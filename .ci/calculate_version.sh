@@ -11,6 +11,11 @@ COMMIT_HASH=$(git rev-parse --short HEAD)
 git diff --no-ext-diff --quiet --exit-code
 DIRTY=$?
 
+git tag
+
+echo "Last tag: $LAST_TAG"
+echo "Commit Count: $COMMIT_COUNT"
+
 VERSION=
 
 if [ "$COMMIT_COUNT" != "0" ]; then
