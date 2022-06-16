@@ -5,7 +5,7 @@ allPagesApi="api.php?action=query&list=allpages&aplimit=100&format=json"
 getPageContext="api.php?action=parse&prop=wikitext&formatversion=2&format=json&disabletoc=true"
 expandTemplates="api.php?action=expandtemplates&prop=wikitext&format=json&disabletoc=true"
 
-continueTitle=
+continueTitle="ASSERT"
 
 while :
 do
@@ -48,11 +48,18 @@ do
                 jq -r ".parse.wikitext" | \
                 sed 's/\\n/\n/g')
 
+            displayTitle=$(echo "$wikitext" | grep "DISPLAYTITLE" | sed -E 's/\{\{DISPLAYTITLE:([^}]+)\}\}/\1/g')
+            echo "DISPLAY TITLE: $displayTitle"
+
             expanded=$(curl -s "$base$expandTemplates" --data-urlencode "title=$pageTitle" --data-urlencode "text=$wikitext" | \
                 jq -r ".expandtemplates.wikitext" | \
                 sed 's/\\n/\n/g' | \
                 sed 's/|  __TOC__/__NOTOC__/g' | \
                 sed -E 's/\[\[([^|]*)\|<span style="color:\#87cefa;">[^<]*<\/span>\]\]/\1/g')
+
+            if [ ! -z "$displayTitle" ]; then
+                pageTitle="$displayTitle"
+            fi
 
             echo "$expanded" > "./wiki/$pageTitle.mediawiki"
         ) &
@@ -69,6 +76,8 @@ do
 
     [ "$continueTitle" == "null" ] && break
 done
+
+cp "./wiki/Main\ Page.mediawiki" ./wiki/Home.mediawiki
 
 cat "./wiki/\$ASSERTS.mediawiki"
 
