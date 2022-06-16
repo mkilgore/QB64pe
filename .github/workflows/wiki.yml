@@ -1,0 +1,24 @@
+name: Wiki-Updater
+
+on:
+  push:
+    branches:
+      - 'wiki-demo'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - uses: actions/checkout@v3
+      with:
+        repository: 'mkilgore/qb64pe.wiki'
+        path: './wiki'
+
+    - name: Download Wiki
+      run: |
+        ./.ci/wiki-downloader.sh
+
+
