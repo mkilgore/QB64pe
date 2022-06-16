@@ -1,59 +1,73 @@
 #!/bin/bash
 
 base="https://qb64phoenix.com/qb64wiki/"
-allPagesApi="api.php?action=query&list=allpages&aplimit=max&format=json"
+allPagesApi="api.php?action=query&list=allpages&aplimit=100&format=json"
 getPageContext="api.php?action=parse&prop=wikitext&formatversion=2&format=json&disabletoc=true"
 expandTemplates="api.php?action=expandtemplates&prop=wikitext&format=json&disabletoc=true"
 
-jsonResponse=$(curl -L "$base$allPagesApi")
+continueTitle=
 
-echo "$jsonResponse"
-
-i=0
-
-echo "$jsonResponse" | jq -c ".query.allpages[]" | while read line
+while :
 do
-    pageid=$(echo "$line" | jq -r ".pageid")
-    pageTitle=$(echo "$line" | jq -r ".title")
 
-    if [ "$pageTitle" == '*' ]; then
-        continue;
+    if [ -z "$continueTitle" ]; then
+        jsonResponse=$(curl -L "$base$allPagesApi")
+    else
+        jsonResponse=$(curl -L "$base$allPagesApi" --data-urlencode "apcontinue=$continueTitle")
     fi
 
-    if [ "$pageTitle" == '/' ]; then
-        continue;
-    fi
+    echo "$jsonResponse"
 
-    if [ "$pageTitle" == '\' ]; then
-        continue;
-    fi
+    continueTitle=$(echo "$jsonResponse" | jq -r ".continue.apcontinue")
 
-    echo "PageID: $pageid"
-    echo "PageTitle: $pageTitle"
+    i=0
 
-    (
-        wikitext=$(curl -s -L "$base$getPageContext&pageid=$pageid" | \
-            jq -r ".parse.wikitext" | \
-            sed 's/\\n/\n/g')
+    echo "$jsonResponse" | jq -c ".query.allpages[]" | while read line
+    do
+        pageid=$(echo "$line" | jq -r ".pageid")
+        pageTitle=$(echo "$line" | jq -r ".title")
 
-        expanded=$(curl -s "$base$expandTemplates" --data-urlencode "title=$pageTitle" --data-urlencode "text=$wikitext" | \
-            jq -r ".expandtemplates.wikitext" | \
-            sed 's/\\n/\n/g' | \
-            sed 's/|  __TOC__/__NOTOC__/g' | \
-            sed -E 's/\[\[([^|]*)\|<span style="color:\#87cefa;">[^<]*<\/span>\]\]/\1/g')
+        if [ "$pageTitle" == '*' ]; then
+            continue;
+        fi
 
-        echo "$expanded" > "./wiki/$pageTitle.mediawiki"
-    ) &
+        if [ "$pageTitle" == '/' ]; then
+            continue;
+        fi
 
-    i=$((i + 1))
-    if [ "$i" == "10" ]; then
-        echo "Wait"
-        wait
-        i=0
-    fi
+        if [ "$pageTitle" == '\' ]; then
+            continue;
+        fi
+
+        echo "PageID: $pageid"
+        echo "PageTitle: $pageTitle"
+
+        (
+            wikitext=$(curl -s -L "$base$getPageContext&pageid=$pageid" | \
+                jq -r ".parse.wikitext" | \
+                sed 's/\\n/\n/g')
+
+            expanded=$(curl -s "$base$expandTemplates" --data-urlencode "title=$pageTitle" --data-urlencode "text=$wikitext" | \
+                jq -r ".expandtemplates.wikitext" | \
+                sed 's/\\n/\n/g' | \
+                sed 's/|  __TOC__/__NOTOC__/g' | \
+                sed -E 's/\[\[([^|]*)\|<span style="color:\#87cefa;">[^<]*<\/span>\]\]/\1/g')
+
+            echo "$expanded" > "./wiki/$pageTitle.mediawiki"
+        ) &
+
+        i=$((i + 1))
+        if [ "$i" == "10" ]; then
+            echo "Wait"
+            wait
+            i=0
+        fi
+    done
+
+    wait
+
+    [ -z "$continueTitle" ] && break
 done
-
-wait
 
 cat "./wiki/\$ASSERTS.mediawiki"
 
