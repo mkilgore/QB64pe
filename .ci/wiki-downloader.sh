@@ -1,8 +1,9 @@
 #!/bin/bash
 
-base="http://qb64phoenix.com/qb64wiki/"
+base="https://qb64phoenix.com/qb64wiki/"
 allPagesApi="api.php?action=query&list=allpages&aplimit=max&format=json"
-getPageContext="api.php?action=parse&prop=wikitext&formatversion=2&format=json"
+getPageContext="api.php?action=parse&prop=wikitext&formatversion=2&format=json&disabletoc=true"
+expandTemplates="api.php?action=expandtemplates&prop=wikitext&format=json&disabletoc=true"
 
 jsonResponse=$(curl -L "$base$allPagesApi")
 
@@ -28,14 +29,19 @@ do
     echo "PageID: $pageid"
     echo "PageTitle: $pageTitle"
 
-    curl -L "$base$getPageContext&pageid=$pageid" | \
-        jq -r ".parse.wikitext" | \
-        sed 's/\\n/\n/g' > "./wiki/$pageTitle.mediawiki" &
+    (
+        wikitext=$(curl -L "$base$getPageContext&pageid=$pageid" | \
+            jq -r ".parse.wikitext" | \
+            sed 's/\\n/\n/g')
 
-    # page=$(curl -L "$base$getPageContext&oldid=$pageid") # > "./wiki/$pageTitle"
-    # wikitext=$(echo "$page" | jq -r ".parse.wikitext" | sed 's/\\n/\n/g')
+        expanded=$(curl "$base$expandTemplates" --data-urlencode "title=$pageTitle" --data-urlencode "text=$wikitext" | \
+            jq -r ".expandtemplates.wikitext" | \
+            sed 's/\\n/\n/g' | \
+            sed 's/|  __TOC__/__NOTOC__/g' | \
+            sed -E 's/\[\[([^|]*)\|<span style="color:\#87cefa;">[^<]*<\/span>\]\]/\1/g')
 
-    # echo "$wikitext" > "./wiki/$pageTitle"
+        echo "$expanded" > "./wiki/$pageTitle.mediawiki"
+    ) &
 done
 
 wait
