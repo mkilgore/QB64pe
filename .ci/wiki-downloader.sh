@@ -19,6 +19,7 @@ do
     echo "$jsonResponse"
 
     continueTitle=$(echo "$jsonResponse" | jq -r ".continue.apcontinue")
+    echo "Continue title: $continueTitle"
 
     i=0
 
@@ -66,7 +67,7 @@ do
 
     wait
 
-    [ -z "$continueTitle" ] && break
+    [ "$continueTitle" == "null" ] && break
 done
 
 cat "./wiki/\$ASSERTS.mediawiki"
