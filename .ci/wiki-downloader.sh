@@ -9,6 +9,8 @@ jsonResponse=$(curl -L "$base$allPagesApi")
 
 echo "$jsonResponse"
 
+i=0
+
 echo "$jsonResponse" | jq -c ".query.allpages[]" | while read line
 do
     pageid=$(echo "$line" | jq -r ".pageid")
@@ -42,6 +44,13 @@ do
 
         echo "$expanded" > "./wiki/$pageTitle.mediawiki"
     ) &
+
+    i=$((i + 1))
+    if [ "$i" == "10" ]; then
+        echo "Wait"
+        wait
+        i=0
+    fi
 done
 
 wait
