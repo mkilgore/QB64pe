@@ -30,11 +30,11 @@ do
     echo "PageTitle: $pageTitle"
 
     (
-        wikitext=$(curl -L "$base$getPageContext&pageid=$pageid" | \
+        wikitext=$(curl -s -L "$base$getPageContext&pageid=$pageid" | \
             jq -r ".parse.wikitext" | \
             sed 's/\\n/\n/g')
 
-        expanded=$(curl "$base$expandTemplates" --data-urlencode "title=$pageTitle" --data-urlencode "text=$wikitext" | \
+        expanded=$(curl -s "$base$expandTemplates" --data-urlencode "title=$pageTitle" --data-urlencode "text=$wikitext" | \
             jq -r ".expandtemplates.wikitext" | \
             sed 's/\\n/\n/g' | \
             sed 's/|  __TOC__/__NOTOC__/g' | \
