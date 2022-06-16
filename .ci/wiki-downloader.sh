@@ -5,7 +5,7 @@ allPagesApi="api.php?action=query&list=allpages&aplimit=100&format=json"
 getPageContext="api.php?action=parse&prop=wikitext&formatversion=2&format=json&disabletoc=true"
 expandTemplates="api.php?action=expandtemplates&prop=wikitext&format=json&disabletoc=true"
 
-continueTitle="ASSERT"
+continueTitle=
 
 while :
 do
@@ -49,6 +49,7 @@ do
                 sed 's/\\n/\n/g')
 
             displayTitle=$(echo "$wikitext" | grep "DISPLAYTITLE" | sed -E 's/\{\{DISPLAYTITLE:([^}]+)\}\}/\1/g')
+            displayTitle=${displayTitle## }
             echo "DISPLAY TITLE: $displayTitle"
 
             expanded=$(curl -s "$base$expandTemplates" --data-urlencode "title=$pageTitle" --data-urlencode "text=$wikitext" | \
@@ -79,7 +80,7 @@ done
 
 cp "./wiki/Main\ Page.mediawiki" ./wiki/Home.mediawiki
 
-cat "./wiki/\$ASSERTS.mediawiki"
+cat "./wiki/Home.mediawiki"
 
 cd ./wiki
 
