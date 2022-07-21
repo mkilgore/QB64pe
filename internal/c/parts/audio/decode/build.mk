@@ -1,5 +1,5 @@
 
-DEP_AUDIO_DECODE_MIDI ?= y
+DEP_AUDIO_DECODE_MIDI ?= $(DEP_AUDIO_DECODE)
 
 decode-midi-srcs-$(DEP_AUDIO_DECODE_MIDI) += tml_impl.cpp
 decode-midi-srcs-$(DEP_AUDIO_DECODE_MIDI) += tsf_impl.cpp
