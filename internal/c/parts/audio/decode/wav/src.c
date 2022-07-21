@@ -1,7 +1,3 @@
-#ifndef DEPENDENCY_AUDIO_DECODE_WAV
-// Stubs:
-//(none required)
-#else
 
 snd_sequence_struct *snd_decode_wav(uint8 *buffer, int32 bytes) {
     // ref: https://ccrma.stanford.edu/courses/422/projects/WaveFormat/
@@ -70,5 +66,3 @@ skip_chunk:
 
     return seq;
 }
-
-#endif
