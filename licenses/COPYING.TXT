@@ -100,3 +100,9 @@ Software/Library Name: LodePNG
 License: (refer to license file)
 License File: license_lodepng.txt
 Location in QB64 distribution: internal/c/parts/video/image/decode/png
+
+Software/Library Name: TinySoundFont
+Author: Bernhard Shelling
+License: MIT
+License File: license_tinysoundfont.txt
+Location in QB64 distribution: internal/c/parts/audio/decode/midi/

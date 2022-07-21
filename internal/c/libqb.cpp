@@ -37457,6 +37457,7 @@ int main(int argc, char *argv[]) {
     this_mouse_message_queue->lastIndex = 65535;
     this_mouse_message_queue->queue = (mouse_message *)calloc(1, sizeof(mouse_message) * (this_mouse_message_queue->lastIndex + 1));
 
+    midi_init();
     snd_init();
 
     if (screen_hide_startup)

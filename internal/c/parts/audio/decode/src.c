@@ -1,3 +1,6 @@
+
+#include "midi/midi.h"
+
 #ifndef DEPENDENCY_AUDIO_DECODE
 // Stubs:
 //(none required)
@@ -40,6 +43,12 @@ static snd_sequence_struct *load_sound_file(qbs *filename)
     // WAV?
     if (lof >= 12 && (*(uint32 *)&content[8]) == 0x45564157) {
         result = snd_decode_wav(content, lof);
+        goto cleanup;
+    }
+
+    // MIDI?
+    if (midi_file_check(content, lof)) {
+        result = snd_decode_midi(content, lof);
         goto cleanup;
     }
 
