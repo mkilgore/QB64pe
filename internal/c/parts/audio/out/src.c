@@ -146,23 +146,6 @@ error:
     error(5);
 }
 
-struct snd_sequence_struct {
-    uint16 *data;
-    int32 data_size;
-    uint8 channels; // note: more than 2 channels may be supported in the future
-    uint16 *data_left;
-    int32 data_left_size;
-    uint16 *data_right;
-    int32 data_right_size;
-
-    // origins of data (only relevent before src)
-    uint8 endian;          // 0=native, 1=little(Windows, x86), 2=big(Motorola, Xilinx Microblaze, IBM POWER)
-    uint8 is_unsigned;     // 1=unsigned, 0=signed(most common)
-    int32 sample_rate;     // eg. 11025, 22100
-    int32 bits_per_sample; // eg. 8, 16
-
-    int32 references; // number of SND handles dependent on this
-};
 list *snd_sequences = list_new(sizeof(snd_sequence_struct));
 
 struct snd_struct {
