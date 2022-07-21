@@ -8,6 +8,7 @@
 #include "snd.h"
 #include "tml.h"
 #include "tsf.h"
+#include "soundfont.h"
 #include "midi.h"
 
 // Number of samples per second
@@ -86,7 +87,11 @@ static void render_samples(snd_sequence_struct *seq, tml_message *current_msg, s
 
 void midi_init(void)
 {
-    midi_soundfont = tsf_load_filename("soundfont.sf2");
+    midi_soundfont = tsf_load_memory(SOUNDFONT_BIN, SOUNDFONT_SIZE);
+
+    // If the soundfont doesn't load for some reason then MIDI support will be left disabled
+    if (!midi_soundfont)
+        return;
 
     // Initialize preset on 10th MIDI channel to use percussion sound bank (128) if available
     tsf_channel_set_bank_preset(midi_soundfont, 9, 128, 0);

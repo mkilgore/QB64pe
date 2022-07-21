@@ -897,6 +897,13 @@ DIM controlvalue(1000) AS LONG
 DIM controlstate(1000) AS INTEGER
 DIM SHARED controlref(1000) AS LONG 'the line number the control was created on
 
+'
+' Collection of flags indicating which unstable features should be in use during compilation
+'
+REDIM SHARED unstableFlags(1) AS _BYTE
+DIM UNSTABLE_MIDI AS LONG
+
+UNSTABLE_MIDI = 1
 
 
 
@@ -1612,7 +1619,18 @@ udtetypesize(i2) = 0 'tsize
 udtenext(i3) = i2
 udtenext(i2) = 0
 
+' Reset all unstable flags
+REDIM SHARED unstableFlags(1) AS _BYTE
 
+' Indicates if a MIDI sound font was selected
+'
+' Captures both the line number and line contents for error reporting later-on
+' in the compilation process
+MidiSoundFontSet = 0
+MidiSoundFontLine$ = ""
+
+' If MidiSoundFont$ is blank, then the default is used
+MidiSoundFont$ = ""
 
 
 
@@ -1890,6 +1908,20 @@ DO
             GOTO finishedlinepp
         END IF
 
+        ' We check for Unstable flags during the preprocessing step because it
+        ' impacts what valid commands there are in all the other steps
+        IF LEFT$(temp$, 10) = "$UNSTABLE:" THEN
+            token$ = UCASE$(LTRIM$(RTRIM$(MID$(temp$, 11))))
+
+            SELECT CASE token$
+                CASE "MIDI"
+                    unstableFlags(UNSTABLE_MIDI) = -1
+
+                CASE ELSE
+                    a$ = "Unrecognized unstable flag " + AddQuotes$(token$)
+                    GOTO errmes
+            END SELECT
+        END IF
 
         cwholeline$ = wholeline$
         wholeline$ = eleucase$(wholeline$) '********REMOVE THIS LINE LATER********
@@ -3403,6 +3435,72 @@ DO
             IF NoChecks = 0 THEN PRINT #12, "do{"
             PRINT #12, "sub__icon(NULL,NULL,0);"
             GOTO finishedline2
+        END IF
+
+        IF LEFT$(a3u$, 10) = "$UNSTABLE:" THEN
+            layout$ = SCase("$Unstable:")
+
+            token$ = LTRIM$(RTRIM$(MID$(a3u$, 11)))
+
+            SELECT CASE token$
+                CASE "MIDI"
+                    layout$ = layout$ + SCase$("Midi")
+            END SELECT
+
+            GOTO finishednonexec
+        END IF
+
+        IF unstableFlags(UNSTABLE_MIDI) THEN
+            IF LEFT$(a3u$, 15) = "$MIDISOUNDFONT:" THEN
+                IF MidiSoundFontSet THEN
+                    a$ = "$MIDISOUNDFONT already defined"
+                    GOTO errmes
+                END IF
+
+                layout$ = SCase$("$MidiSoundFont:")
+
+                MidiSoundFont$ = LTRIM$(RTRIM$(MID$(a3$, 16)))
+
+                IF MID$(MidiSoundFont$, 1, 1) = CHR$(34) THEN
+                    ' We have a quoted filename, verify it is valid
+
+                    ' We don't touch the filename in the formatting
+                    layout$ = layout$ + MidiSoundFont$
+
+                    ' Strip the leading quote
+                    MidiSoundFont$ = MID$(MidiSoundFont$, 2)
+
+                    ' Verify that there is a quote character at the end
+                    IF INSTR(MidiSoundFont$, CHR$(34)) = 0 THEN a$ = "Expected " + CHR$(34) + " character at the end of the file name": GOTO errmes
+
+                    ' Verify there are no extra characters after end quote
+                    IF INSTR(MidiSoundFont$, CHR$(34)) <> LEN(MidiSoundFont$) THEN a$ = "Unexpected characters after the quoted file name": GOTO errmes
+
+                    MidiSoundFont$ = MID$(MidiSoundFont$, 1, LEN(MidiSoundFont$) - 1)
+
+                    IF NOT _FILEEXISTS(MidiSoundFont$) THEN
+                        a$ = "Soundfont file " + AddQuotes$(MidiSoundFont$) + " could not be found!"
+                        GOTO errmes
+                    END IF
+                ELSE
+                    ' Constant values, only one for now
+                    SELECT CASE UCASE$(MidiSoundFont$)
+                        CASE "DEFAULT"
+                            layout$ = layout$ + SCase$("Default")
+
+                            ' Clear MidiSoundFont$ to indicate the default should be used
+                            MidiSoundFont$ = ""
+
+                        CASE ELSE
+                            a$ = "Unrecognized Soundfont option " + AddQuotes$(MidiSoundFont$)
+                            GOTO errmes
+                    END SELECT
+                END IF
+
+                MidiSoundFontSet = linenumber
+                MidiSoundFontLine$ = layout$
+                GOTO finishednonexec
+            END IF
         END IF
 
     END IF 'QB64 Metacommands
@@ -12470,6 +12568,22 @@ IF VersionInfoSet OR ExeIconSet THEN
     END IF
 END IF
 
+IF MidiSoundFontSet THEN
+    linenumber = MidiSoundFontSet
+    wholeline = MidiSoundFontLine$
+
+    IF MidiSoundFont$ = "" THEN
+        MidiSoundFont$ = "internal/support/default_soundfont.sf2"
+    END IF
+
+    ON ERROR GOTO qberror_test
+
+    errNo = CopyFile&(MidiSoundFont$, tmpdir$ + "soundfont.sf2")
+    IF errNo <> 0 THEN a$ = "Error copying " + QuotedFilename$(MidiSoundFont$) + " to temp directory": GOTO errmes
+
+    ON ERROR GOTO qberror
+END IF
+
 'Update dependencies
 
 o$ = LCASE$(os$)
@@ -12502,6 +12616,8 @@ IF DEPENDENCY(DEPENDENCY_ZLIB) THEN makedeps$ = makedeps$ + " DEP_ZLIB=y"
 IF inline_DATA = 0 AND DataOffset THEN makedeps$ = makedeps$ + " DEP_DATA=y"
 IF Console THEN makedeps$ = makedeps$ + " DEP_CONSOLE=y"
 IF ExeIconSet OR VersionInfoSet THEN makedeps$ = makedeps$ + " DEP_ICON_RC=y"
+
+IF MidiSoundFontSet THEN makedeps$ = makedeps$ + " DEP_AUDIO_DECODE_MIDI=y"
 
 IF tempfolderindex > 1 THEN makedeps$ = makedeps$ + " TEMP_ID=" + str2$(tempfolderindex)
 
