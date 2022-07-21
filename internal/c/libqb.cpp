@@ -23,6 +23,7 @@
 #endif
 
 #include "mutex.h"
+#include "snd.h"
 
 int32 disableEvents = 0;
 
