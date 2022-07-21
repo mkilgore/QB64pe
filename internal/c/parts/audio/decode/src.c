@@ -12,6 +12,50 @@
 void sub__sndvol(int32 handle, float volume);
 void sub__sndclose(int32 handle);
 
+static snd_sequence_struct *load_sound_file(qbs *filename)
+{
+    snd_sequence_struct *result = NULL;
+    int32 read_length;
+
+    int32 fh = gfs_open(filename, 1, 0, 0);
+    if (fh < 0)
+        return NULL;
+
+    int64 lof = gfs_lof(fh);
+
+    uint8_t *content = (uint8_t *)malloc(lof);
+    if (!content)
+        goto cleanup;
+
+    read_length = gfs_read(fh, -1, content, lof);
+    if (read_length < 0)
+        goto cleanup;
+
+    // OGG?
+    if (lof >= 3 && strncmp((const char *)content, "Ogg", 3) == 0) {
+        result = snd_decode_ogg(content, lof);
+        goto cleanup;
+    }
+
+    // WAV?
+    if (lof >= 12 && (*(uint32 *)&content[8]) == 0x45564157) {
+        result = snd_decode_wav(content, lof);
+        goto cleanup;
+    }
+
+    // assume mp3!
+    result = snd_decode_mp3(content, lof);
+
+cleanup:
+    if (content)
+        free(content);
+
+    if (fh >= 0)
+        gfs_close(fh);
+
+    return result;
+}
+
 int32 func__sndopen(qbs *filename, qbs *requirements, int32 passed) {
     sndsetup();
     if (new_error)
@@ -25,54 +69,8 @@ int32 func__sndopen(qbs *filename, qbs *requirements, int32 passed) {
     // load file
     if (s1->len == 1)
         return 0; // return invalid handle if null length string
-    static int32 fh, result;
-    static int64 lof;
-    fh = gfs_open(s1, 1, 0, 0);
-    if (fh < 0)
-        return 0;
-    lof = gfs_lof(fh);
-    static uint8 *content;
-    content = (uint8 *)malloc(lof);
-    if (!content) {
-        gfs_close(fh);
-        return 0;
-    }
-    result = gfs_read(fh, -1, content, lof);
-    gfs_close(fh);
-    if (result < 0) {
-        free(content);
-        return 0;
-    }
 
-    // identify file format
-    static snd_sequence_struct *seq;
-
-    // OGG?
-    if (lof >= 3) {
-        if (content[0] == 79) {
-            if (content[1] == 103) {
-                if (content[2] == 103) { //"Ogg"
-                    seq = snd_decode_ogg(content, lof);
-                    goto got_seq;
-                }
-            }
-        }
-    } // 3
-
-    // WAV?
-    if (lof >= 12) {
-        if ((*(uint32 *)&content[8]) == 0x45564157) { // WAVE
-            seq = snd_decode_wav(content, lof);
-            goto got_seq;
-        } // WAVE
-    }
-
-    // assume mp3!
-    // MP3?
-    seq = snd_decode_mp3(content, lof);
-
-got_seq:
-    free(content);
+    snd_sequence_struct *seq = load_sound_file(s1);
     if (seq == NULL)
         return 0;
 
@@ -87,7 +85,8 @@ got_seq:
         incorrect_format = 1;
     if (seq->is_unsigned)
         incorrect_format = 1;
-    // todo... if (seq->endian==???)
+
+    // TODO: if (seq->endian==???)
 
     // this section does not fix the frequency, only the bits per sample
     // and signed-ness of the data
