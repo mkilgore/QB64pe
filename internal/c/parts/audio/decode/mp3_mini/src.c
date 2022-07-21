@@ -1,14 +1,6 @@
-#ifndef DEPENDENCY_AUDIO_DECODE_MP3
-// Stubs:
-//(none required)
-#else
 
 extern "C" {
-#    ifdef QB64_BACKSLASH_FILESYSTEM
-#        include "src\\minimp3.h"
-#    else
-#        include "src/minimp3.h"
-#    endif
+#include "src/minimp3.h"
 }
 
 snd_sequence_struct *snd_decode_mp3(uint8 *buffer, int32 bytes) {
@@ -73,5 +65,3 @@ mp3getmore:
 
     return seq;
 }
-
-#endif

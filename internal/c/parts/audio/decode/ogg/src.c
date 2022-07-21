@@ -1,15 +1,6 @@
-#ifndef DEPENDENCY_AUDIO_DECODE_OGG
-// Stubs:
-//(none required)
-#else
 
-#    ifdef QB64_BACKSLASH_FILESYSTEM
-#        define STB_VORBIS_HEADER_ONLY
-#        include "src\\stb_vorbis.c"
-#    else
-#        define STB_VORBIS_HEADER_ONLY
-#        include "src/stb_vorbis.c"
-#    endif
+#define STB_VORBIS_HEADER_ONLY
+#include "src/stb_vorbis.c"
 
 snd_sequence_struct *snd_decode_ogg(uint8 *buffer, int32 bytes) {
 
@@ -44,5 +35,3 @@ snd_sequence_struct *snd_decode_ogg(uint8 *buffer, int32 bytes) {
 
     return seq;
 }
-
-#endif

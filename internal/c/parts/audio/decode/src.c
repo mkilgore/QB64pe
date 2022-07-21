@@ -3,31 +3,10 @@
 //(none required)
 #else
 
-#    define DEPENDENCY_AUDIO_DECODE_OGG
-#    define DEPENDENCY_AUDIO_DECODE_MP3
-#    define DEPENDENCY_AUDIO_DECODE_WAV
+#    include "mp3_mini/src.c"
+#    include "wav/src.c"
+#    include "ogg/src.c"
 
-#    ifdef QB64_BACKSLASH_FILESYSTEM
-#        ifdef DEPENDENCY_AUDIO_DECODE_MP3
-#            include "mp3_mini\\src.c"
-#        endif
-#        ifdef DEPENDENCY_AUDIO_DECODE_WAV
-#            include "wav\\src.c"
-#        endif
-#        ifdef DEPENDENCY_AUDIO_DECODE_OGG
-#            include "ogg\\src.c"
-#        endif
-#    else
-#        ifdef DEPENDENCY_AUDIO_DECODE_MP3
-#            include "mp3_mini/src.c"
-#        endif
-#        ifdef DEPENDENCY_AUDIO_DECODE_WAV
-#            include "wav/src.c"
-#        endif
-#        ifdef DEPENDENCY_AUDIO_DECODE_OGG
-#            include "ogg/src.c"
-#        endif
-#    endif
 #    include <string.h>
 // forward refs:
 void sub__sndvol(int32 handle, float volume);
@@ -69,7 +48,6 @@ int32 func__sndopen(qbs *filename, qbs *requirements, int32 passed) {
     static snd_sequence_struct *seq;
 
     // OGG?
-#    ifdef DEPENDENCY_AUDIO_DECODE_OGG
     if (lof >= 3) {
         if (content[0] == 79) {
             if (content[1] == 103) {
@@ -80,23 +58,18 @@ int32 func__sndopen(qbs *filename, qbs *requirements, int32 passed) {
             }
         }
     } // 3
-#    endif
 
     // WAV?
-#    ifdef DEPENDENCY_AUDIO_DECODE_WAV
     if (lof >= 12) {
         if ((*(uint32 *)&content[8]) == 0x45564157) { // WAVE
             seq = snd_decode_wav(content, lof);
             goto got_seq;
         } // WAVE
     }
-#    endif
 
     // assume mp3!
     // MP3?
-#    ifdef DEPENDENCY_AUDIO_DECODE_MP3
     seq = snd_decode_mp3(content, lof);
-#    endif
 
 got_seq:
     free(content);
