@@ -16,11 +16,11 @@ extern "C" {
 #   define SOUNDFONT_BIN _binary_soundfont_sf2_start
 #   define SOUNDFONT_SIZE _binary_soundfont_sf2_size
 #else
-    extern char binary_soundfont_sf2_start[];
-    extern size_t binary_soundfont_sf2_size;
+    extern char _binary_soundfont_sf2_start[];
+    extern size_t _binary_soundfont_sf2_size;
 
-#   define SOUNDFONT_BIN binary_soundfont_sf2_start
-#   define SOUNDFONT_SIZE binary_soundfont_sf2_size
+#   define SOUNDFONT_BIN _binary_soundfont_sf2_start
+#   define SOUNDFONT_SIZE _binary_soundfont_sf2_size
 #endif
 }
 
