@@ -14,7 +14,16 @@ EOF
 
 chmod go+r $HOME/.asoundrc
 
-cat << EOF >> /etc/modules.conf
+sudo cat << EOF >> /etc/modules.conf
+# ALSA portion
+alias char-major-116 snd
+alias snd-card-0 snd-dummy
+# module options should go here
+       
+# OSS/Free portion
+alias char-major-14 soundcore
+alias sound-slot-0 snd-card-0
+
 # OSS/Free portion - card #1
 alias sound-slot-0 snd-card-0
 alias sound-service-0-0 snd-mixer-oss
@@ -24,4 +33,4 @@ alias sound-service-0-8 snd-seq-oss
 alias sound-service-0-12 snd-pcm-oss
 EOF
 
-modprobe snd-dummy
+sudo modprobe snd-dummy
