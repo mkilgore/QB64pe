@@ -1,5 +1,7 @@
 #!/bin/bash
 
+modinfo soundcore
+
 cat << EOF > $HOME/.asoundrc
        pcm.dummy {
           type hw
@@ -14,7 +16,7 @@ EOF
 
 chmod go+r $HOME/.asoundrc
 
-sudo cat << EOF >> /etc/modules.conf
+sudo cat << EOF >> /etc/modprobe.d/alsa.conf
 # ALSA portion
 alias char-major-116 snd
 alias snd-card-0 snd-dummy
