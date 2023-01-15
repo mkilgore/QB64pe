@@ -914,7 +914,18 @@ DIM UNSTABLE_HTTP AS LONG
 UNSTABLE_MIDI = 1
 UNSTABLE_HTTP = 2
 
+'
+' Performance profiling
+'
+TYPE ProfileEntry
+    entryName As String
+    startTime As Single
+    endTime As Single
+    level As Long
+END TYPE
 
+Dim Shared profileEntries(1000) As ProfileEntry
+Dim Shared profileCount As Long
 
 
 ON ERROR GOTO qberror
@@ -1225,6 +1236,9 @@ file$ = f$
 'MUST be defined in cmem!
 
 fullrecompile:
+profileCount = 0
+AddProfileEntry "Full Compile", 0
+AddProfileEntry "Variable Initialization", 1
 
 IF idemode = 0 AND NOT QuietMode THEN
     PRINT
@@ -1649,7 +1663,7 @@ MidiSoundFont$ = ""
 
 
 
-
+AddProfileEntry "Compilation start", 1
 
 
 'begin compilation
@@ -1709,6 +1723,7 @@ IF idemode THEN GOTO ideret1
 
 lineinput3load sourcefile$
 
+AddProfileEntry "Prepass 1", 1
 DO
 
     '### STEVE EDIT FOR CONST EXPANSION 10/11/2013
@@ -2865,6 +2880,7 @@ DO
 
     IF idemode THEN GOTO ideret2
 LOOP
+AddProfileEntry "Prepass 2", 1
 
 'add final line
 IF lastLineReturn = 0 THEN
@@ -2882,6 +2898,7 @@ totallinenumber = reallinenumber
 'IF idemode = 0 AND NOT QuietMode THEN PRINT "first pass finished.": PRINT "Translating code... "
 
 'prepass finished
+AddProfileEntry "regular compile pass", 1
 
 lineinput3index = 1 'reset input line
 
@@ -11635,6 +11652,7 @@ FOR i = 1 TO idn
     cleared:
     clearerasereturned:
 NEXT
+AddProfileEntry "regular compile finish-up", 1
 
 IF Debug THEN
     PRINT #9, "finished making program!"
@@ -11760,6 +11778,7 @@ lastunresolved = unresolved
 'END IF
 'END IF
 
+AddProfileEntry "Common array fixup", 1
 IF Debug THEN PRINT #9, "Beginning COMMON array list check..."
 xi = 1
 FOR x = 1 TO commonarraylistn
@@ -11808,6 +11827,7 @@ IF recompile THEN
     GOTO recompile
 END IF
 
+AddProfileEntry "Label check", 1
 IF Debug THEN PRINT #9, "Beginning label check..."
 FOR r = 1 TO nLabels
 
@@ -11911,6 +11931,7 @@ IF vWatchOn = 1 THEN
 END IF
 
 
+AddProfileEntry "Handling DATA", 1
 'DATA_finalize
 WriteBufLine GlobTxtBuf, "ptrszint data_size=" + str2(DataOffset) + ";"
 IF DataOffset = 0 THEN
@@ -11957,6 +11978,7 @@ ELSE
     END IF
 END IF
 
+AddProfileEntry "Create COMMON save code", 1
 IF Debug THEN PRINT #9, "Beginning generation of code for saving/sharing common array data..."
 use_global_byte_elements = 1
 ncommontmp = 0
@@ -12372,6 +12394,7 @@ IF idemode = 0 AND No_C_Compile_Mode = 0 THEN
     path.exe$ = t.path.exe$
 END IF
 
+AddProfileEntry "Handle Windows EXE resources", 1
 IF ExeIconSet THEN
     linenumber = ExeIconSet 'on error, this allows reporting the linenumber where $EXEICON was used
     wholeline = " $EXEICON:'" + ExeIconFile$ + "'"
@@ -12468,11 +12491,14 @@ IF VersionInfoSet OR ExeIconSet THEN
     END IF
 END IF
 
+AddProfileEntry "Write internal buffers", 1
 'Write out all buffered files, all remaining
 'actions are performed on the disk based files
 WriteBuffers ""
 
 IF MidiSoundFontSet THEN
+    AddProfileEntry "Copy MIDI soundfont", 1
+
     linenumber = MidiSoundFontSet
     wholeline = MidiSoundFontLine$
 
@@ -12595,6 +12621,7 @@ IF os$ = "WIN" THEN
 
     makeline$ = makeline$ + " OS=win"
 
+    AddProfileEntry "Resolve static functions", 1
     'resolve static function definitions and add to global.txt
     FOR x = 1 TO ResolveStaticFunctions
         nm_output_file$ = MakeNMOutputFilename$(ResolveStaticFunction_File(x))
@@ -12712,6 +12739,7 @@ IF os$ = "WIN" THEN
     NEXT
 
     IF No_C_Compile_Mode = 0 THEN
+        AddProfileEntry "Call make", 1
         SHELL _HIDE "cmd /c " + makeline$ + " 1>> " + compilelog$ + " 2>&1"
 
         IF idemode THEN
@@ -12745,6 +12773,7 @@ IF os$ = "LNX" THEN
         makeline$ = makeline$ + " OS=lnx"
     END IF
 
+    AddProfileEntry "Resolve static functions", 1
     FOR x = 1 TO ResolveStaticFunctions
         nm_output_file$ = MakeNMOutputFilename$(ResolveStaticFunction_File(x))
         IF LEN(ResolveStaticFunction_File(x)) THEN
@@ -12942,6 +12971,7 @@ IF os$ = "LNX" THEN
     END IF
 
     IF No_C_Compile_Mode = 0 THEN
+        AddProfileEntry "Call make", 1
         SHELL _HIDE makeline$ + " 1>> " + compilelog$ + " 2>&1"
         IF idemode THEN
             'Restore fg/bg colors
@@ -12968,6 +12998,8 @@ IF os$ = "LNX" THEN
     END IF
 
 END IF
+
+WriteProfileEntries
 
 IF No_C_Compile_Mode THEN compfailed = 0: GOTO No_C_Compile
 IF path.exe$ = "../../" OR path.exe$ = "..\..\" THEN path.exe$ = ""
@@ -26116,6 +26148,7 @@ END FUNCTION
 '$INCLUDE:'subs_functions\extensions\opengl\opengl_methods.bas'
 '$INCLUDE:'utilities\ini-manager\ini.bm'
 '$INCLUDE:'utilities\s-buffer\simplebuffer.bm'
+'$INCLUDE:'utilities\profiling.bas'
 
 DEFLNG A-Z
 
