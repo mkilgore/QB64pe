@@ -52,7 +52,11 @@ jobs:
       # audio testing on Linux
     - name: Start Pulseaudio
       if: ${{ matrix.prefix == 'lnx' }}
-      run: dbus-launch pulseaudio --start
+      run: |
+        dbus-launch pulseaudio --start
+        strip ./tests/compile_tests/declare_library_external/liblib.so
+        nm ./tests/compile_tests/declare_library_external/liblib.so
+        nm -D ./tests/compile_tests/declare_library_external/liblib.so
 
     - name: Calculate Version
       shell: bash
