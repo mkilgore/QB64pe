@@ -7,6 +7,7 @@
 #include <stdio.h>
 
 #include "command.h"
+#include "logging.h"
 #include "event.h"
 #include "gui.h"
 #include "error_handle.h"
@@ -225,6 +226,7 @@ void fix_error() {
 }
 
 void error(int32_t error_number) {
+    libqb_log_error("QB64 Error %d reported: %s", error_number, human_error(error_number));
 
     // critical errors:
 

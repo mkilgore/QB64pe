@@ -133,7 +133,11 @@ do
 
         pushd . > /dev/null
         cd "./tests/compile_tests/$category"
-        testResult=$($LNX_PREFIX "../../../$EXE" "../../../$RESULTS_DIR" "$category-$testName" 2>&1)
+        testResult=$(\
+            QB64PE_LOG_HANDLERS=file \
+            QB64PE_LOG_SCOPES="qb64,libqb,libqb-image,libqb-audio" \
+            QB64PE_LOG_FILE_PATH="../../../$RESULTS_DIR/$category-$testName-log.txt" \
+            $LNX_PREFIX "../../../$EXE" "../../../$RESULTS_DIR" "$category-$testName" 2>&1)
         ERR=$?
         popd > /dev/null
 

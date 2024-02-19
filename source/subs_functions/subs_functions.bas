@@ -4141,3 +4141,50 @@ id.specialformat = "[?][,[?][,[?][,?]]]"
 id.ret = STRINGTYPE - ISPOINTER ' return type for functions
 id.hr_syntax = "_SAVEFILEDIALOG$([title$][, defaultPathAndFile$][, filterPatterns$][, singleFilterDescription$])"
 regid
+
+clearid
+id.n = qb64prefix$ + "LogTrace"
+id.subfunc = 2
+id.callname = "sub__log_trace"
+id.args = 1
+id.arg = MKL$(STRINGTYPE - ISPOINTER)
+id.hr_syntax = "_LOGTRACE msg$"
+regid
+
+clearid
+id.n = qb64prefix$ + "LogInfo"
+id.subfunc = 2
+id.callname = "sub__log_info"
+id.args = 1
+id.arg = MKL$(STRINGTYPE - ISPOINTER)
+id.hr_syntax = "_LOGINFO msg$"
+regid
+
+clearid
+id.n = qb64prefix$ + "LogWarn"
+id.subfunc = 2
+id.callname = "sub__log_warn"
+id.args = 1
+id.arg = MKL$(STRINGTYPE - ISPOINTER)
+id.hr_syntax = "_LOGWARN msg$"
+regid
+
+clearid
+id.n = qb64prefix$ + "LogError"
+id.subfunc = 2
+id.callname = "sub__log_error"
+id.args = 1
+id.arg = MKL$(STRINGTYPE - ISPOINTER)
+id.hr_syntax = "_LOGERROR msg$"
+regid
+
+clearid
+id.n = qb64prefix$ + "LogMinLevel"
+id.subfunc = 1
+id.callname = "func__logminlevel"
+id.args = 0
+id.arg = ""
+ideret = LONGTYPE - ISPOINTER
+id.hr_syntax = "_LOGMINLEVEL"
+regid
+

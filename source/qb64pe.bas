@@ -10475,6 +10475,81 @@ DO
                     END SELECT
                 END IF
 
+                IF firstelement$ = "_LOGTRACE" OR firstelement$ = qb64prefix$ + "LOGTRACE" THEN
+                    EmitLoggingStatement getelements$(ca$, 2, n), "TRACE", LEFT$(firstelement$, 1) = "_"
+                    IF Error_Happened THEN GOTO errmes
+                    GOTO finishedline
+                END IF
+
+                IF firstelement$ = "_LOGINFO" OR firstelement$ = qb64prefix$ + "LOGINFO" THEN
+                    EmitLoggingStatement getelements$(ca$, 2, n), "INFO", LEFT$(firstelement$, 1) = "_"
+                    IF Error_Happened THEN GOTO errmes
+                    GOTO finishedline
+                END IF
+
+                IF firstelement$ = "_LOGWARN" OR firstelement$ = qb64prefix$ + "LOGWARN" THEN
+                    EmitLoggingStatement getelements$(ca$, 2, n), "WARN", LEFT$(firstelement$, 1) = "_"
+                    IF Error_Happened THEN GOTO errmes
+                    GOTO finishedline
+                END IF
+
+                IF firstelement$ = "_LOGERROR" OR firstelement$ = qb64prefix$ + "LOGERROR" THEN
+                    EmitLoggingStatement getelements$(ca$, 2, n), "ERROR", LEFT$(firstelement$, 1) = "_"
+                    IF Error_Happened THEN GOTO errmes
+                    GOTO finishedline
+                END IF
+
+                '     OR firstelement$ = qb64prefix$ + "LOGINFO" THEN
+
+                '     e$ = fixoperationorder(getelements$(ca$, 2, n))
+                '     IF Error_Happened THEN GOTO errmes
+                '     l$ = SCase$("_LogInfo") + sp + tlayout$
+                '     layoutdone = 1: IF LEN(layout$) THEN layout$ = layout$ + sp + l$ ELSE layout$ = l$
+                '     e$ = evaluate(e$, typ)
+
+                '     IF inclevel = 0 THEN
+                '         WriteBufLine MainTxtBuf, "sub__loginfo(" + AddQuotes$(escapeString$(sourcefile$)) + ", " + AddQuotes$(escapeString$(subfunc$)) + ", " + _TRIM$(STR$(linenumber)) + ", (const char *)" + evaluatetotyp(getelement$(ca$, 2), ISSTRING) + "->chr);"
+                '     ELSE
+                '         WriteBufLine MainTxtBuf, "sub__loginfo(" + AddQuotes$(escapeString$(incname$(inclevel))) + ", " + AddQuotes$(escapeString$(subfunc$)) + ", " + _TRIM$(STR$(inclinenumber(inclevel))) + ", (const char *)" + evaluatetotyp(getelement$(ca$, 2), ISSTRING) + "->chr);"
+                '     END IF
+
+                '     IF Error_Happened THEN GOTO errmes
+                '     GOTO finishedline
+                ' END IF
+
+                ' IF firstelement$ = "_LOGTRACE" OR firstelement$ = qb64prefix$ + "LOGTRACE" THEN
+                '     IF inclevel = 0 THEN
+                '         WriteBufLine MainTxtBuf, "sub__logtrace(" + AddQuotes$(escapeString$(sourcefile$)) + ", " + AddQuotes$(escapeString$(subfunc$)) + ", " + _TRIM$(STR$(linenumber)) + ", (const char *)" + evaluatetotyp(getelement$(ca$, 2), ISSTRING) + "->chr);"
+                '     ELSE
+                '         WriteBufLine MainTxtBuf, "sub__logtrace(" + AddQuotes$(escapeString$(incname$(inclevel))) + ", " + AddQuotes$(escapeString$(subfunc$)) + ", " + _TRIM$(STR$(inclinenumber(inclevel))) + ", (const char *)" + evaluatetotyp(getelement$(ca$, 2), ISSTRING) + "->chr);"
+                '     END IF
+
+                '     IF Error_Happened THEN GOTO errmes
+                '     GOTO finishedline
+                ' END IF
+
+                ' IF firstelement$ = "_LOGWARN" OR firstelement$ = qb64prefix$ + "LOGWARN" THEN
+                '     IF inclevel = 0 THEN
+                '         WriteBufLine MainTxtBuf, "sub__logwarn(" + AddQuotes$(escapeString$(sourcefile$)) + ", " + AddQuotes$(escapeString$(subfunc$)) + ", " + _TRIM$(STR$(linenumber)) + ", (const char *)" + evaluatetotyp(getelement$(ca$, 2), ISSTRING) + "->chr);"
+                '     ELSE
+                '         WriteBufLine MainTxtBuf, "sub__logwarn(" + AddQuotes$(escapeString$(incname$(inclevel))) + ", " + AddQuotes$(escapeString$(subfunc$)) + ", " + _TRIM$(STR$(inclinenumber(inclevel))) + ", (const char *)" + evaluatetotyp(getelement$(ca$, 2), ISSTRING) + "->chr);"
+                '     END IF
+
+                '     IF Error_Happened THEN GOTO errmes
+                '     GOTO finishedline
+                ' END IF
+
+                ' IF firstelement$ = "_LOGERROR" OR firstelement$ = qb64prefix$ + "LOGERROR" THEN
+                '     IF inclevel = 0 THEN
+                '         WriteBufLine MainTxtBuf, "sub__logerror(" + AddQuotes$(escapeString$(sourcefile$)) + ", " + AddQuotes$(escapeString$(subfunc$)) + ", " + _TRIM$(STR$(linenumber)) + ", (const char *)" + evaluatetotyp(getelement$(ca$, 2), ISSTRING) + "->chr);"
+                '     ELSE
+                '         WriteBufLine MainTxtBuf, "sub__logerror(" + AddQuotes$(escapeString$(incname$(inclevel))) + ", " + AddQuotes$(escapeString$(subfunc$)) + ", " + _TRIM$(STR$(inclinenumber(inclevel))) + ", (const char *)" + evaluatetotyp(getelement$(ca$, 2), ISSTRING) + "->chr);"
+                '     END IF
+
+                '     IF Error_Happened THEN GOTO errmes
+                '     GOTO finishedline
+                ' END IF
+
                 'any other "unique" subs can be processed above
 
                 id2 = id
@@ -23789,6 +23864,7 @@ END FUNCTION
 '$INCLUDE:'utilities\type.bas'
 '$INCLUDE:'utilities\give_error.bas'
 '$INCLUDE:'utilities\format.bas'
+'$INCLUDE:'emit\logging.bas'
 
 DEFLNG A-Z
 

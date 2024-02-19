@@ -13,8 +13,6 @@
 
 #pragma once
 
-// Uncomment this to to print debug messages to stderr
-// #define AUDIO_DEBUG 1
 #include "audio.h"
 #include "extras/foo_midi/InstrumentBankManager.h"
 #include "miniaudio.h"
@@ -79,7 +77,7 @@ class BufferMap {
     ~BufferMap() {
         for (auto &it : buffers) {
             free(it.second.data);
-            AUDIO_DEBUG_PRINT("Buffer freed of size %llu", it.second.size);
+            audio_log_info("Buffer freed of size %llu", it.second.size);
         }
     }
 
@@ -101,11 +99,11 @@ class BufferMap {
             memcpy(buf.data, data, size);
             buffers.emplace(key, std::move(buf));
 
-            AUDIO_DEBUG_PRINT("Added buffer of size %llu to map", size);
+            audio_log_info("Added buffer of size %llu to map", size);
             return true;
         }
 
-        AUDIO_DEBUG_PRINT("Failed to add buffer of size %llu", size);
+        audio_log_warn("Failed to add buffer of size %llu", size);
         return false;
     }
 
@@ -116,9 +114,9 @@ class BufferMap {
         if (it != buffers.end()) {
             auto &buf = it->second;
             buf.refCount += 1;
-            AUDIO_DEBUG_PRINT("Increased reference count to %llu", buf.refCount);
+            audio_log_info("Increased reference count to %llu", buf.refCount);
         } else {
-            AUDIO_DEBUG_PRINT("Buffer not found");
+            audio_log_warn("Buffer not found");
         }
     }
 
@@ -129,15 +127,15 @@ class BufferMap {
         if (it != buffers.end()) {
             auto &buf = it->second;
             buf.refCount -= 1;
-            AUDIO_DEBUG_PRINT("Decreased reference count to %llu", buf.refCount);
+            audio_log_info("Decreased reference count to %llu", buf.refCount);
 
             if (buf.refCount < 1) {
                 free(buf.data);
-                AUDIO_DEBUG_PRINT("Buffer freed of size %llu", buf.size);
+                audio_log_info("Buffer freed of size %llu", buf.size);
                 buffers.erase(key);
             }
         } else {
-            AUDIO_DEBUG_PRINT("Buffer not found");
+            audio_log_warn("Buffer not found");
         }
     }
 
@@ -147,11 +145,11 @@ class BufferMap {
     std::pair<const void *, size_t> GetBuffer(intptr_t key) const {
         const auto it = buffers.find(key);
         if (it == buffers.end()) {
-            AUDIO_DEBUG_PRINT("Buffer not found");
+            audio_log_warn("Buffer not found");
             return {nullptr, 0};
         }
         const auto &buf = it->second;
-        AUDIO_DEBUG_PRINT("Returning buffer of size %llu", buf.size);
+        audio_log_info("Returning buffer of size %llu", buf.size);
         return {buf.data, buf.size};
     }
 };

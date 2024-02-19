@@ -9,17 +9,19 @@
 //
 //----------------------------------------------------------------------------------------------------------------------
 
+#include "libqb-common.h"
+
 #include "cmem.h"
 #include "datetime.h"
 #include "error_handle.h"
 #include "filepath.h"
 #include "filesystem.h"
 #include "framework.h"
-#include "libqb-common.h"
 #include "mem.h"
 #include "miniaudio.h"
 #include "mutex.h"
 #include "qbs.h"
+#include "logging.h"
 
 // This is returned to the caller if handle allocation fails with a -1
 // CreateHandle() does not return 0 because it is a valid internal handle
@@ -220,14 +222,14 @@ static ma_data_source_vtable rawStreamDataSourceVtable = {
 /// @return Returns a pointer to a data source if successful, NULL otherwise
 static RawStream *RawStreamCreate(ma_engine *pmaEngine, ma_sound *pmaSound) {
     if (!pmaEngine || !pmaSound) { // these should not be NULL
-        AUDIO_DEBUG_PRINT("Invalid arguments");
+        audio_log_error("Invalid arguments");
 
         return nullptr;
     }
 
     auto pRawStream = new RawStream(pmaEngine, pmaSound); // create the data source object
     if (!pRawStream) {
-        AUDIO_DEBUG_PRINT("Failed to create data source");
+        audio_log_error("Failed to create data source");
 
         return nullptr;
     }
@@ -239,7 +241,7 @@ static RawStream *RawStreamCreate(ma_engine *pmaEngine, ma_sound *pmaSound) {
 
     auto result = ma_data_source_init(&pRawStream->maDataSourceConfig, &pRawStream->maDataSource);
     if (result != MA_SUCCESS) {
-        AUDIO_DEBUG_PRINT("Error %i: failed to initialize data source", result);
+        audio_log_error("Error %i: failed to initialize data source", result);
 
         delete pRawStream;
 
@@ -249,7 +251,7 @@ static RawStream *RawStreamCreate(ma_engine *pmaEngine, ma_sound *pmaSound) {
     result = ma_sound_init_from_data_source(pmaEngine, &pRawStream->maDataSource, MA_SOUND_FLAG_NO_PITCH | MA_SOUND_FLAG_NO_SPATIALIZATION, NULL,
                                             pmaSound); // attach data source to the ma_sound
     if (result != MA_SUCCESS) {
-        AUDIO_DEBUG_PRINT("Error %i: failed to initialize sound from data source", result);
+        audio_log_error("Error %i: failed to initialize sound from data source", result);
 
         delete pRawStream;
 
@@ -258,7 +260,7 @@ static RawStream *RawStreamCreate(ma_engine *pmaEngine, ma_sound *pmaSound) {
 
     result = ma_sound_start(pmaSound); // play the ma_sound
     if (result != MA_SUCCESS) {
-        AUDIO_DEBUG_PRINT("Error %i: failed to start sound playback", result);
+        audio_log_error("Error %i: failed to start sound playback", result);
 
         ma_sound_uninit(pmaSound); // delete the ma_sound object
 
@@ -267,7 +269,7 @@ static RawStream *RawStreamCreate(ma_engine *pmaEngine, ma_sound *pmaSound) {
         return nullptr;
     }
 
-    AUDIO_DEBUG_PRINT("Raw sound stream created");
+    audio_log_info("Raw sound stream created");
 
     return pRawStream;
 }
@@ -283,7 +285,7 @@ static void RawStreamDestroy(RawStream *pRawStream) {
 
         delete pRawStream; // delete the raw stream object
 
-        AUDIO_DEBUG_PRINT("Raw sound stream destroyed");
+        audio_log_info("Raw sound stream destroyed");
     }
 }
 
@@ -360,8 +362,10 @@ class PSG {
         auto neededFrames = (ma_uint64)(waveDuration * rawStream->sampleRate);
 
         if (!neededFrames || maWaveform.config.frequency >= 20000 || mixCursor + neededFrames > waveBuffer.size()) {
-            AUDIO_DEBUG_PRINT("Not generating any waveform. Frames = %llu, frequency = %lf, cursor = %llu", neededFrames, maWaveform.config.frequency,
-                              mixCursor);
+            audio_log_warn("Not generating any waveform. Frames = %llu, frequency = %lf, cursor = %llu",
+                    neededFrames,
+                    maWaveform.config.frequency,
+                    mixCursor);
             return; // nothing to do
         }
 
@@ -384,7 +388,7 @@ class PSG {
         }
 
         if (maResult != MA_SUCCESS) {
-            AUDIO_DEBUG_PRINT("maResult = %i", maResult);
+            audio_log_warn("maResult = %i", maResult);
             return; // something went wrong
         }
 
@@ -406,7 +410,7 @@ class PSG {
                 destination[i] += noteBuffer[i] * rampFactor; // apply the ramp factor to the sample and mix it with the destination buffer
             }
 
-            AUDIO_DEBUG_PRINT("Waveform = %i, frames requested = %llu, frames mixed = %llu", int(waveformType), neededFrames, generatedFrames);
+            audio_log_info("Waveform = %i, frames requested = %llu, frames mixed = %llu", int(waveformType), neededFrames, generatedFrames);
         } else {
             // Copy the samples to the buffer
             for (size_t i = 0; i < generatedFrames; i++) {
@@ -421,7 +425,7 @@ class PSG {
                 destination[i] = noteBuffer[i] * rampFactor; // apply the ramp factor to the sample
             }
 
-            AUDIO_DEBUG_PRINT("Waveform = %i, frames requested = %llu, frames generated = %llu", int(waveformType), neededFrames, generatedFrames);
+            audio_log_info("Waveform = %i, frames requested = %llu, frames generated = %llu", int(waveformType), neededFrames, generatedFrames);
         }
     }
 
@@ -438,7 +442,7 @@ class PSG {
         if (!waveBuffer.empty()) {
             rawStream->PushMonoSampleFrames(waveBuffer.data(), waveBuffer.size(), panning);
 
-            AUDIO_DEBUG_PRINT("Sent %llu samples for playback", waveBuffer.size());
+            audio_log_info("Sent %llu samples for playback", waveBuffer.size());
 
             waveBuffer.clear(); // set the buffer size to zero
             mixCursor = 0;      // reset the cursor
@@ -452,12 +456,12 @@ class PSG {
 
         auto timeSec = rawStream->GetTimeRemaining() * 0.95 - 0.25; // per original QB64 behavior
 
-        AUDIO_DEBUG_PRINT("Waiting %f seconds for playback to complete", timeSec);
+        audio_log_info("Waiting %f seconds for playback to complete", timeSec);
 
         if (timeSec > 0)
             sub__delay(timeSec); // we are using sub_delay() because ON TIMER and other events may need to be called while we are waiting
 
-        AUDIO_DEBUG_PRINT("Playback complete");
+        audio_log_info("Playback complete");
     }
 
   public:
@@ -495,7 +499,7 @@ class PSG {
 
         SetWaveformType(DEFAULT_WAVEFORM_TYPE); // this calls the underlying miniaudio API
 
-        AUDIO_DEBUG_PRINT("PSG initialized @ %uHz", maWaveform.config.sampleRate);
+        audio_log_info("PSG initialized @ %uHz", maWaveform.config.sampleRate);
     }
 
     /// @brief This just frees the waveform buffer and cleans up the waveform resources
@@ -503,7 +507,7 @@ class PSG {
         ma_noise_uninit(&maNoise, NULL); // destroy miniaudio noise
         ma_waveform_uninit(&maWaveform); // destroy miniaudio waveform
 
-        AUDIO_DEBUG_PRINT("PSG destroyed");
+        audio_log_info("PSG destroyed");
     }
 
     /// @brief Sets the waveform type
@@ -531,7 +535,7 @@ class PSG {
 
         waveformType = waveType;
 
-        AUDIO_DEBUG_PRINT("Waveform type set to %i", int(waveformType));
+        audio_log_info("Waveform type set to %i", int(waveformType));
     }
 
     /// @brief Sets the amplitude of the waveform
@@ -542,7 +546,7 @@ class PSG {
         maResult = ma_noise_set_amplitude(&maNoise, amplitude);
         AUDIO_DEBUG_CHECK(maResult == MA_SUCCESS);
 
-        AUDIO_DEBUG_PRINT("Amplitude set to %lf", amplitude);
+        audio_log_info("Amplitude set to %lf", amplitude);
     }
 
     /// @brief Set the PSG panning value
@@ -550,7 +554,7 @@ class PSG {
     void SetPanning(float value) {
         panning = value;
 
-        AUDIO_DEBUG_PRINT("Panning set to %f", panning);
+        audio_log_info("Panning set to %f", panning);
     }
 
     /// @brief Plays a typical retro PC speaker BEEP sound. The volume, waveform and background mode can be changed using PLAY
@@ -1275,7 +1279,7 @@ struct AudioEngine {
         // This will help us quickly allocate a free handle and should be a decent optimization for SndPlayCopy()
         for (h = lowestFreeHandle; h < vectorSize; h++) {
             if (!soundHandles[h]->isUsed) {
-                AUDIO_DEBUG_PRINT("Recent sound handle %zu recycled", h);
+                audio_log_info("Recent sound handle %zu recycled", h);
                 break;
             }
         }
@@ -1286,7 +1290,7 @@ struct AudioEngine {
             // Also, this loop should not execute if size is 0
             for (h = 0; h < vectorSize; h++) {
                 if (!soundHandles[h]->isUsed) {
-                    AUDIO_DEBUG_PRINT("Sound handle %zu recycled", h);
+                    audio_log_info("Sound handle %zu recycled", h);
                     break;
                 }
             }
@@ -1311,7 +1315,7 @@ struct AudioEngine {
 
             h = newVectorSize - 1; // The handle is simply newVectorSize - 1
 
-            AUDIO_DEBUG_PRINT("Sound handle %zu created", h);
+            audio_log_info("Sound handle %zu created", h);
         }
 
         AUDIO_DEBUG_CHECK(soundHandles[h]->isUsed == false);
@@ -1332,7 +1336,7 @@ struct AudioEngine {
         soundHandles[h]->memLockOffset = nullptr;
         soundHandles[h]->isUsed = true;
 
-        AUDIO_DEBUG_PRINT("Sound handle %zu returned", h);
+        audio_log_info("Sound handle %zu returned", h);
 
         lowestFreeHandle = h + 1; // Set lowestFreeHandle to allocated handle + 1
 
@@ -1364,12 +1368,12 @@ struct AudioEngine {
 
             case SoundHandle::Type::NONE:
                 if (handle != 0)
-                    AUDIO_DEBUG_PRINT("Sound type is 'None' when handle value is not 0");
+                    audio_log_info("Sound type is 'None' when handle value is not 0");
 
                 break;
 
             default:
-                AUDIO_DEBUG_PRINT("Condition not handled"); // It should not come here
+                audio_log_info("Condition not handled"); // It should not come here
             }
 
             // Free any initialized miniaudio decoder
@@ -1378,14 +1382,14 @@ struct AudioEngine {
                 delete soundHandles[handle]->maDecoder;
                 soundHandles[handle]->maDecoder = nullptr;
                 bufferMap.Release(soundHandles[handle]->bufferKey);
-                AUDIO_DEBUG_PRINT("Decoder uninitialized");
+                audio_log_info("Decoder uninitialized");
             }
 
             // Free any initialized audio buffer
             if (soundHandles[handle]->maAudioBuffer) {
                 ma_audio_buffer_uninit_and_free(soundHandles[handle]->maAudioBuffer);
                 soundHandles[handle]->maAudioBuffer = nullptr;
-                AUDIO_DEBUG_PRINT("Audio buffer uninitialized & freed");
+                audio_log_info("Audio buffer uninitialized & freed");
             }
 
             // Invalidate any memsound stuff
@@ -1393,7 +1397,7 @@ struct AudioEngine {
                 free_mem_lock((mem_lock *)soundHandles[handle]->memLockOffset);
                 soundHandles[handle]->memLockId = INVALID_MEM_LOCK;
                 soundHandles[handle]->memLockOffset = nullptr;
-                AUDIO_DEBUG_PRINT("MemSound stuff invalidated");
+                audio_log_info("MemSound stuff invalidated");
             }
 
             // Now simply set the 'isUsed' member to false so that the handle can be recycled
@@ -1404,7 +1408,7 @@ struct AudioEngine {
             if (handle < lowestFreeHandle)
                 lowestFreeHandle = handle;
 
-            AUDIO_DEBUG_PRINT("Sound handle %i marked as free", handle);
+            audio_log_info("Sound handle %i marked as free", handle);
         }
     }
 };
@@ -1423,7 +1427,7 @@ static bool InitializePSG() {
         audioEngine.soundHandles[audioEngine.sndInternal]->rawStream =
             RawStreamCreate(&audioEngine.maEngine, &audioEngine.soundHandles[audioEngine.sndInternal]->maSound);
         if (!audioEngine.soundHandles[audioEngine.sndInternal]->rawStream) {
-            AUDIO_DEBUG_PRINT("Failed to create rawStream object for PSG");
+            audio_log_warn("Failed to create rawStream object for PSG");
             return false;
         }
         audioEngine.soundHandles[audioEngine.sndInternal]->type = SoundHandle::Type::RAW;
@@ -1431,7 +1435,7 @@ static bool InitializePSG() {
         if (!audioEngine.psg) {
             audioEngine.psg = new PSG(audioEngine.soundHandles[audioEngine.sndInternal]->rawStream);
             if (!audioEngine.psg) {
-                AUDIO_DEBUG_PRINT("Failed to create PSG object");
+                audio_log_warn("Failed to create PSG object");
                 RawStreamDestroy(audioEngine.soundHandles[audioEngine.sndInternal]->rawStream);
                 audioEngine.soundHandles[audioEngine.sndInternal]->rawStream = nullptr;
                 audioEngine.soundHandles[audioEngine.sndInternal]->type = SoundHandle::Type::NONE;
@@ -1532,7 +1536,7 @@ static ma_result InitializeSoundFromMemory(const void *buffer, size_t size, int3
 
     audioEngine.soundHandles[handle]->maDecoder = new ma_decoder(); // allocate and zero memory
     if (!audioEngine.soundHandles[handle]->maDecoder) {
-        AUDIO_DEBUG_PRINT("Failed to allocate memory for miniaudio decoder");
+        audio_log_error("Failed to allocate memory for miniaudio decoder");
         return MA_OUT_OF_MEMORY;
     }
 
@@ -1546,7 +1550,7 @@ static ma_result InitializeSoundFromMemory(const void *buffer, size_t size, int3
     if (audioEngine.maResult != MA_SUCCESS) {
         delete audioEngine.soundHandles[handle]->maDecoder;
         audioEngine.soundHandles[handle]->maDecoder = nullptr;
-        AUDIO_DEBUG_PRINT("Error %i: failed to initialize miniaudio decoder", audioEngine.maResult);
+        audio_log_error("Error %i: failed to initialize miniaudio decoder", audioEngine.maResult);
         return audioEngine.maResult;
     }
 
@@ -1558,7 +1562,7 @@ static ma_result InitializeSoundFromMemory(const void *buffer, size_t size, int3
         ma_decoder_uninit(audioEngine.soundHandles[handle]->maDecoder);
         delete audioEngine.soundHandles[handle]->maDecoder;
         audioEngine.soundHandles[handle]->maDecoder = nullptr;
-        AUDIO_DEBUG_PRINT("Error %i: failed to initialize sound", audioEngine.maResult);
+        audio_log_error("Error %i: failed to initialize sound", audioEngine.maResult);
         return audioEngine.maResult;
     }
 
@@ -1627,7 +1631,7 @@ int32_t func__sndopen(qbs *qbsFileName, qbs *qbsRequirements, int32_t passed) {
     } else {
         std::string fileName(reinterpret_cast<char const *>(qbsFileName->chr), qbsFileName->len);
 
-        AUDIO_DEBUG_PRINT("Loading sound from file '%s'", fileName.c_str());
+        audio_log_info("Loading sound from file '%s'", fileName.c_str());
 
         // Forward the request to miniaudio to open the sound file
         audioEngine.maResult = ma_sound_init_from_file(&audioEngine.maEngine, filepath_fix_directory(fileName), audioEngine.soundHandles[handle]->maFlags, NULL,
@@ -1636,12 +1640,12 @@ int32_t func__sndopen(qbs *qbsFileName, qbs *qbsRequirements, int32_t passed) {
 
     // If the sound failed to initialize, then free the handle and return INVALID_SOUND_HANDLE
     if (audioEngine.maResult != MA_SUCCESS) {
-        AUDIO_DEBUG_PRINT("Error %i: failed to open sound", audioEngine.maResult);
+        audio_log_error("Error %i: failed to open sound", audioEngine.maResult);
         audioEngine.soundHandles[handle]->isUsed = false;
         return INVALID_SOUND_HANDLE;
     }
 
-    AUDIO_DEBUG_PRINT("Sound successfully loaded");
+    audio_log_info("Sound successfully loaded");
 
     return handle;
 }
@@ -1683,7 +1687,7 @@ int32_t func__sndcopy(int32_t src_handle) {
     // Sadly, since this involves a buffer copy there may be a delay before the sound can play (especially if the sound is lengthy)
     // The delay may be noticeable when _SNDPLAYCOPY is used multiple times on the a _SNDNEW sound
     if (audioEngine.soundHandles[src_handle]->maAudioBuffer) {
-        AUDIO_DEBUG_PRINT("Doing custom sound copy for ma_audio_buffer");
+        audio_log_info("Doing custom sound copy for ma_audio_buffer");
 
         auto frames = audioEngine.soundHandles[src_handle]->maAudioBuffer->ref.sizeInFrames;
         auto channels = audioEngine.soundHandles[src_handle]->maAudioBuffer->ref.channels;
@@ -1698,7 +1702,7 @@ int32_t func__sndcopy(int32_t src_handle) {
         memcpy((void *)audioEngine.soundHandles[dst_handle]->maAudioBuffer->ref.pData, audioEngine.soundHandles[src_handle]->maAudioBuffer->ref.pData,
                frames * ma_get_bytes_per_frame(format, channels)); // naughty const void* casting, but should be OK
     } else if (audioEngine.soundHandles[src_handle]->maDecoder) {
-        AUDIO_DEBUG_PRINT("Doing custom sound copy for ma_decoder");
+        audio_log_info("Doing custom sound copy for ma_decoder");
 
         dst_handle = audioEngine.CreateHandle(); // allocate a sound handle
         if (dst_handle < 1)
@@ -1714,12 +1718,12 @@ int32_t func__sndcopy(int32_t src_handle) {
         if (audioEngine.maResult != MA_SUCCESS) {
             audioEngine.bufferMap.Release(audioEngine.soundHandles[dst_handle]->bufferKey);
             audioEngine.soundHandles[dst_handle]->isUsed = false;
-            AUDIO_DEBUG_PRINT("Error %i: failed to copy sound", audioEngine.maResult);
+            audio_log_error("Error %i: failed to copy sound", audioEngine.maResult);
 
             return INVALID_SOUND_HANDLE;
         }
     } else {
-        AUDIO_DEBUG_PRINT("Doing regular miniaudio sound copy");
+        audio_log_info("Doing regular miniaudio sound copy");
 
         dst_handle = audioEngine.CreateHandle(); // allocate a sound handle
         if (dst_handle < 1)
@@ -1735,7 +1739,7 @@ int32_t func__sndcopy(int32_t src_handle) {
         // If the sound failed to copy, then free the handle and return INVALID_SOUND_HANDLE
         if (audioEngine.maResult != MA_SUCCESS) {
             audioEngine.soundHandles[dst_handle]->isUsed = false;
-            AUDIO_DEBUG_PRINT("Error %i: failed to copy sound", audioEngine.maResult);
+            audio_log_error("Error %i: failed to copy sound", audioEngine.maResult);
 
             return INVALID_SOUND_HANDLE;
         }
@@ -1767,7 +1771,7 @@ void sub__sndplay(int32_t handle) {
             ma_sound_set_looping(&audioEngine.soundHandles[handle]->maSound, MA_FALSE);
         }
 
-        AUDIO_DEBUG_PRINT("Playing sound %i", handle);
+        audio_log_info("Playing sound %i", handle);
     }
 }
 
@@ -1785,7 +1789,7 @@ void sub__sndplaycopy(int32_t src_handle, double volume, double x, double y, dou
     // We are not checking if the audio engine was initialized because if not we'll get an invalid handle anyway
     auto dst_handle = func__sndcopy(src_handle);
 
-    AUDIO_DEBUG_PRINT("Source handle = %i, destination handle = %i", src_handle, dst_handle);
+    audio_log_info("Source handle = %i, destination handle = %i", src_handle, dst_handle);
 
     // Check if we succeeded and then proceed
     if (dst_handle > 0) {
@@ -1805,7 +1809,7 @@ void sub__sndplaycopy(int32_t src_handle, double volume, double x, double y, dou
         sub__sndplay(dst_handle);                              // Play the sound
         audioEngine.soundHandles[dst_handle]->autoKill = true; // Set to auto kill
 
-        AUDIO_DEBUG_PRINT("Playing sound copy %i: volume %lf, 3D (%lf, %lf, %lf)", dst_handle, volume, x, y, z);
+        audio_log_info("Playing sound copy %i: volume %lf, 3D (%lf, %lf, %lf)", dst_handle, volume, x, y, z);
     }
 }
 
@@ -2154,7 +2158,7 @@ int32_t func__sndnew(int32_t frames, int32_t channels, int32_t bits) {
 
     // Validate all parameters
     if ((channels != 1 && channels != 2) || (bits != 16 && bits != 32 && bits != 8)) {
-        AUDIO_DEBUG_PRINT("Invalid channels (%i) or bits (%i)", channels, bits);
+        audio_log_error("Invalid channels (%i) or bits (%i)", channels, bits);
         return INVALID_SOUND_HANDLE;
     }
 
@@ -2179,7 +2183,7 @@ int32_t func__sndnew(int32_t frames, int32_t channels, int32_t bits) {
     audioEngine.maResult =
         ma_audio_buffer_alloc_and_init(&audioEngine.soundHandles[handle]->maAudioBufferConfig, &audioEngine.soundHandles[handle]->maAudioBuffer);
     if (audioEngine.maResult != MA_SUCCESS) {
-        AUDIO_DEBUG_PRINT("Error %i: failed to initialize audio buffer", audioEngine.maResult);
+        audio_log_error("Error %i: failed to initialize audio buffer", audioEngine.maResult);
         audioEngine.soundHandles[handle]->isUsed = false;
         return INVALID_SOUND_HANDLE;
     }
@@ -2188,7 +2192,7 @@ int32_t func__sndnew(int32_t frames, int32_t channels, int32_t bits) {
     audioEngine.maResult = ma_sound_init_from_data_source(&audioEngine.maEngine, audioEngine.soundHandles[handle]->maAudioBuffer,
                                                           audioEngine.soundHandles[handle]->maFlags, NULL, &audioEngine.soundHandles[handle]->maSound);
     if (audioEngine.maResult != MA_SUCCESS) {
-        AUDIO_DEBUG_PRINT("Error %i: failed to initialize data source", audioEngine.maResult);
+        audio_log_error("Error %i: failed to initialize data source", audioEngine.maResult);
         ma_audio_buffer_uninit_and_free(audioEngine.soundHandles[handle]->maAudioBuffer);
         audioEngine.soundHandles[handle]->maAudioBuffer = nullptr;
         audioEngine.soundHandles[handle]->isUsed = false;
@@ -2225,68 +2229,68 @@ mem_block func__memsound(int32_t handle, int32_t targetChannel, int32_t passed) 
 
     // Return invalid mem_block if audio is not initialized, handle is invalid or sound type is not static
     if (!audioEngine.isInitialized || !IS_SOUND_HANDLE_VALID(handle) || audioEngine.soundHandles[handle]->type != SoundHandle::Type::STATIC) {
-        AUDIO_DEBUG_PRINT("Invalid handle (%i) or sound type (%i)", handle, int(audioEngine.soundHandles[handle]->type));
+        audio_log_warn("Invalid handle (%i) or sound type (%i)", handle, int(audioEngine.soundHandles[handle]->type));
         return mb;
     }
 
     // Simply return an "empty" mem_block if targetChannel is not 0 or 1
     if (passed && targetChannel != 0 && targetChannel != 1) {
-        AUDIO_DEBUG_PRINT("Invalid channel (%i)", targetChannel);
+        audio_log_warn("Invalid channel (%i)", targetChannel);
         return mb;
     }
 
     // Check what kind of sound we are dealing with and take appropriate path
     if (audioEngine.soundHandles[handle]->maAudioBuffer) { // we are dealing with a user created audio buffer
-        AUDIO_DEBUG_PRINT("Entering ma_audio_buffer path");
+        audio_log_info("Entering ma_audio_buffer path");
         maFormat = audioEngine.soundHandles[handle]->maAudioBuffer->ref.format;
         channels = audioEngine.soundHandles[handle]->maAudioBuffer->ref.channels;
         sampleFrames = audioEngine.soundHandles[handle]->maAudioBuffer->ref.sizeInFrames;
         data = (intptr_t)audioEngine.soundHandles[handle]->maAudioBuffer->ref.pData;
     } else { // we are dealing with a sound loaded from file or memory
-        AUDIO_DEBUG_PRINT("Entering ma_resource_manager_data_buffer path");
+        audio_log_info("Entering ma_resource_manager_data_buffer path");
 
         // The sound cannot be steaming and must be completely decoded in memory
         if (audioEngine.soundHandles[handle]->maFlags & MA_SOUND_FLAG_STREAM || !(audioEngine.soundHandles[handle]->maFlags & MA_SOUND_FLAG_DECODE)) {
-            AUDIO_DEBUG_PRINT("Sound data is not completely decoded");
+            audio_log_warn("Sound data is not completely decoded");
             return mb;
         }
 
         // Get the pointer to the data source
         auto ds = (ma_resource_manager_data_buffer *)ma_sound_get_data_source(&audioEngine.soundHandles[handle]->maSound);
         if (!ds || !ds->pNode) {
-            AUDIO_DEBUG_PRINT("Data source pointer OR data source node pointer is NULL");
+            audio_log_warn("Data source pointer OR data source node pointer is NULL");
             return mb;
         }
 
         // Check if the data is one contiguous buffer or a link list of decoded pages
         // We cannot have a mem object for a link list of decoded pages for obvious reasons
         if (ds->pNode->data.type != ma_resource_manager_data_supply_type::ma_resource_manager_data_supply_type_decoded) {
-            AUDIO_DEBUG_PRINT("Data is not a contiguous buffer. Type = %u", ds->pNode->data.type);
+            audio_log_warn("Data is not a contiguous buffer. Type = %u", ds->pNode->data.type);
             return mb;
         }
 
         // Check the data pointer
         if (!ds->pNode->data.backend.decoded.pData) {
-            AUDIO_DEBUG_PRINT("Data source data pointer is NULL");
+            audio_log_warn("Data source data pointer is NULL");
             return mb;
         }
 
         // Query the data format
         if (ma_sound_get_data_format(&audioEngine.soundHandles[handle]->maSound, &maFormat, &channels, NULL, NULL, 0) != MA_SUCCESS) {
-            AUDIO_DEBUG_PRINT("Data format query failed");
+            audio_log_warn("Data format query failed");
             return mb;
         }
 
         // Get the length in sample frames
         if (ma_sound_get_length_in_pcm_frames(&audioEngine.soundHandles[handle]->maSound, &sampleFrames) != MA_SUCCESS) {
-            AUDIO_DEBUG_PRINT("PCM frames query failed");
+            audio_log_warn("PCM frames query failed");
             return mb;
         }
 
         data = (intptr_t)ds->pNode->data.backend.decoded.pData;
     }
 
-    AUDIO_DEBUG_PRINT("Format = %u, channels = %u, frames = %llu", maFormat, channels, sampleFrames);
+    audio_log_info("Format = %u, channels = %u, frames = %llu", maFormat, channels, sampleFrames);
 
     // Setup type: This was not done in the old code
     // But we are doing it here. By examining the type the user can now figure out if they have to use FP32 or integers
@@ -2308,16 +2312,16 @@ mem_block func__memsound(int32_t handle, int32_t targetChannel, int32_t passed) 
         break;
 
     default:
-        AUDIO_DEBUG_PRINT("Unsupported audio format");
+        audio_log_warn("Unsupported audio format");
         return mb;
     }
 
     if (audioEngine.soundHandles[handle]->memLockOffset) {
-        AUDIO_DEBUG_PRINT("Returning previously created mem_lock");
+        audio_log_info("Returning previously created mem_lock");
         mb.lock_offset = (intptr_t)audioEngine.soundHandles[handle]->memLockOffset;
         mb.lock_id = audioEngine.soundHandles[handle]->memLockId;
     } else {
-        AUDIO_DEBUG_PRINT("Returning new mem_lock");
+        audio_log_info("Returning new mem_lock");
         new_mem_lock();
         mem_lock_tmp->type = MEM_TYPE_SOUND;
         mb.lock_offset = (intptr_t)mem_lock_tmp;
@@ -2332,7 +2336,7 @@ mem_block func__memsound(int32_t handle, int32_t targetChannel, int32_t passed) 
     mb.sound = handle;                                           // Copy the handle
     mb.image = 0;                                                // Not needed. Set to 0
 
-    AUDIO_DEBUG_PRINT("ElementSize = %lli, size = %lli, type = %lli, pointer = %lld", mb.elementsize, mb.size, mb.type, mb.offset);
+    audio_log_info("ElementSize = %lli, size = %lli, type = %lli, pointer = %lld", mb.elementsize, mb.size, mb.type, mb.offset);
 
     return mb;
 }
@@ -2424,7 +2428,7 @@ void snd_init() {
     audioEngine.maResult = ma_resource_manager_init(&audioEngine.maResourceManagerConfig, &audioEngine.maResourceManager);
     if (audioEngine.maResult != MA_SUCCESS) {
         audioEngine.initializationFailed = true;
-        AUDIO_DEBUG_PRINT("Failed to initialize miniaudio resource manager");
+        audio_log_error("Failed to initialize miniaudio resource manager");
         return;
     }
 
@@ -2438,7 +2442,7 @@ void snd_init() {
     if (audioEngine.maResult != MA_SUCCESS) {
         ma_resource_manager_uninit(&audioEngine.maResourceManager);
         audioEngine.initializationFailed = true;
-        AUDIO_DEBUG_PRINT("miniaudio initialization failed");
+        audio_log_error("miniaudio initialization failed");
         return;
     }
 
@@ -2450,7 +2454,7 @@ void snd_init() {
     // Set the initialized flag as true
     audioEngine.isInitialized = true;
 
-    AUDIO_DEBUG_PRINT("Audio engine initialized @ %uHz", audioEngine.sampleRate);
+    audio_log_info("Audio engine initialized @ %uHz", audioEngine.sampleRate);
 
     // Reserve sound handle 0 so that nothing else can use it
     // We will use this handle internally for Play(), Beep(), Sound() etc.
@@ -2488,7 +2492,7 @@ void snd_un_init() {
         // Set engine initialized flag as false
         audioEngine.isInitialized = false;
 
-        AUDIO_DEBUG_PRINT("Audio engine shutdown");
+        audio_log_info("Audio engine shutdown");
     }
 }
 
@@ -2514,12 +2518,12 @@ void snd_mainloop() {
 
                     case SoundHandle::Type::NONE:
                         if (handle != 0)
-                            AUDIO_DEBUG_PRINT("Sound type is 'None' when handle value is not 0");
+                            audio_log_warn("Sound type is 'None' when handle value is not 0");
 
                         break;
 
                     default:
-                        AUDIO_DEBUG_PRINT("Condition not handled"); // It should not come here
+                        audio_log_warn("Condition not handled"); // It should not come here
                     }
                 }
             }
