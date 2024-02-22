@@ -93,7 +93,7 @@ do
 
     if [ "$compileFromBase" == "y" ]; then
         # -m and -q make sure that we get predictable results
-        "$QB64" "-f:OptimizeCppProgram=true" $compilerFlags -q -m -x "./tests/compile_tests/$category/$testName.bas" -o "$EXE" 1>"$compileResultOutput"
+        "$QB64" "-f:OptimizeCppProgram=true" "-f:StripDebugSymbols=false" $compilerFlags -q -m -x "./tests/compile_tests/$category/$testName.bas" -o "$EXE" 1>"$compileResultOutput"
         ERR=$?
     else
         pushd . >/dev/null
