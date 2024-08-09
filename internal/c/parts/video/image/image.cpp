@@ -959,14 +959,14 @@ void sub__saveimage(qbs *qbsFileName, int32_t imageHandle, qbs *qbsRequirements,
             jo_gif_frame(&gif, reinterpret_cast<unsigned char *>(pixels.data()), 0, false);
             jo_gif_end(&gif);
         } else {
-            IMAGE_DEBUG_PRINT("jo_gif_start() failed");
+            image_log_error("jo_gif_start() failed");
             error(QB_ERROR_ILLEGAL_FUNCTION_CALL);
         }
     } break;
 
     case SaveFormat::ICO: {
         if (!curico_save_file(fileName.c_str(), width, height, sizeof(uint32_t), pixels.data())) {
-            IMAGE_DEBUG_PRINT("curico_save_file() failed");
+            image_log_error("curico_save_file() failed");
             error(QB_ERROR_ILLEGAL_FUNCTION_CALL);
         }
     } break;

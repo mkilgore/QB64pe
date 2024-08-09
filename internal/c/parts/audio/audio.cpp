@@ -1589,7 +1589,7 @@ int32_t func__sndopen(qbs *qbsFileName, qbs *qbsRequirements, int32_t passed) {
     audioEngine.soundHandles[handle]->maFlags |= MA_SOUND_FLAG_ASYNC;   // set the sound to decode asynchronously by default
     bool fromMemory = false;                                            // we'll assume we are loading the sound from disk
 
-    AUDIO_DEBUG_PRINT("Sound set to fully decode asynchronously");
+    audio_log_info("Sound set to fully decode asynchronously");
 
     if (passed && qbsRequirements->len) {
         // Parse all flags in one go
@@ -1599,25 +1599,25 @@ int32_t func__sndopen(qbs *qbsFileName, qbs *qbsRequirements, int32_t passed) {
         // Check if user wants to set the stream flag
         if (requirements.find("stream") != std::string::npos) {
             audioEngine.soundHandles[handle]->maFlags |= MA_SOUND_FLAG_STREAM;
-            AUDIO_DEBUG_PRINT("Sound will be streamed");
+            audio_log_info("Sound will be streamed");
         }
 
         // Check if the user wants to unset the decode flag
         if (requirements.find("nodecode") != std::string::npos) {
             audioEngine.soundHandles[handle]->maFlags &= ~MA_SOUND_FLAG_DECODE;
-            AUDIO_DEBUG_PRINT("Sound will not be decoded");
+            audio_log_info("Sound will not be decoded");
         }
 
         // Check if the user wants to unset the async flag
         if (requirements.find("noasync") != std::string::npos) {
             audioEngine.soundHandles[handle]->maFlags &= ~MA_SOUND_FLAG_ASYNC;
-            AUDIO_DEBUG_PRINT("Sound will not be decoded asynchronously");
+            audio_log_info("Sound will not be decoded asynchronously");
         }
 
         // Check for memory flag
         if (requirements.find("memory") != std::string::npos) {
             fromMemory = true;
-            AUDIO_DEBUG_PRINT("Sound will be loaded from memory");
+            audio_log_info("Sound will be loaded from memory");
         }
     }
 
@@ -2199,7 +2199,7 @@ int32_t func__sndnew(int32_t frames, int32_t channels, int32_t bits) {
         return INVALID_SOUND_HANDLE;
     }
 
-    AUDIO_DEBUG_PRINT("Frames = %llu, channels = %i, bits = %i, ma_format = %i, pointer = %p",
+    audio_log_info("Frames = %llu, channels = %i, bits = %i, ma_format = %i, pointer = %p",
                       audioEngine.soundHandles[handle]->maAudioBuffer->ref.sizeInFrames, audioEngine.soundHandles[handle]->maAudioBuffer->ref.channels, bits,
                       audioEngine.soundHandles[handle]->maAudioBuffer->ref.format, audioEngine.soundHandles[handle]->maAudioBuffer->ref.pData);
 
@@ -2350,7 +2350,7 @@ void sub__midisoundbank(qbs *qbsFileName, qbs *qbsRequirements, int32_t passed) 
     static const char *SoundBankName[] = {"wopl", "op2", "tmb", "opl", "sf2", "sf3", "sfo", "ad", "unknown"};
 
     if (!audioEngine.isInitialized || !qbsFileName->len) {
-        AUDIO_DEBUG_PRINT("Invalid parameters passed");
+        audio_log_error("Invalid parameters passed");
         return;
     }
 
@@ -2362,18 +2362,18 @@ void sub__midisoundbank(qbs *qbsFileName, qbs *qbsRequirements, int32_t passed) 
         std::string requirements(reinterpret_cast<const char *>(qbsRequirements->chr), qbsRequirements->len);
         std::transform(requirements.begin(), requirements.end(), requirements.begin(), ::tolower);
 
-        AUDIO_DEBUG_PRINT("Parsing requirements string: %s", requirements.c_str());
+        audio_log_info("Parsing requirements string: %s", requirements.c_str());
 
         if (requirements.find("memory") != std::string::npos) {
             fromMemory = true;
-            AUDIO_DEBUG_PRINT("Sound bank will be loaded from memory");
+            audio_log_info("Sound bank will be loaded from memory");
         }
 
         for (auto i = 0; i < GET_ARRAY_SIZE(SoundBankName); i++) {
-            AUDIO_DEBUG_PRINT("Checking for: %s", SoundBankName[i]);
+            audio_log_info("Checking for: %s", SoundBankName[i]);
             if (requirements.find(SoundBankName[i]) != std::string::npos) {
                 format = SoundBankFormat(i);
-                AUDIO_DEBUG_PRINT("Found: %s", SoundBankName[int(format)]);
+                audio_log_info("Found: %s", SoundBankName[int(format)]);
                 break;
             }
         }
@@ -2384,13 +2384,13 @@ void sub__midisoundbank(qbs *qbsFileName, qbs *qbsRequirements, int32_t passed) 
         switch (format) {
         case SoundBankFormat::SF2:
             g_InstrumentBankManager.SetData(qbsFileName->chr, qbsFileName->len, InstrumentBankManager::Type::Primesynth);
-            AUDIO_DEBUG_PRINT("Uncompressed SondFont");
+            audio_log_info("Uncompressed SondFont");
             break;
 
         case SoundBankFormat::SF3:
         case SoundBankFormat::SFO:
             g_InstrumentBankManager.SetData(qbsFileName->chr, qbsFileName->len, InstrumentBankManager::Type::TinySoundFont);
-            AUDIO_DEBUG_PRINT("Compressed SondFont");
+            audio_log_info("Compressed SondFont");
             break;
 
         case SoundBankFormat::AD:
@@ -2399,11 +2399,11 @@ void sub__midisoundbank(qbs *qbsFileName, qbs *qbsRequirements, int32_t passed) 
         case SoundBankFormat::TMB:
         case SoundBankFormat::WOPL:
             g_InstrumentBankManager.SetData(qbsFileName->chr, qbsFileName->len, InstrumentBankManager::Type::Opal);
-            AUDIO_DEBUG_PRINT("FM Bank");
+            audio_log_info("FM Bank");
             break;
 
         default:
-            AUDIO_DEBUG_PRINT("Unknown format");
+            audio_log_info("Unknown format");
             return;
         }
     } else {
