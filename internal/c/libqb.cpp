@@ -29510,11 +29510,6 @@ static bool isValidCygwinPipe(int fd) {
             setbuf(stderr, NULL);
             return true;
         }
-
-        printf("Filename: %.*s\n", (int)nameinfo->FileNameLength, (char *)nameinfo->FileName);
-        for (wchar_t *c = nameinfo->FileName; *c; c++) {
-            printf("Char: %c\n", (char)*c);
-        }
     }
 
     return false;
@@ -29527,7 +29522,7 @@ int main(int argc, char *argv[]) {
 #ifdef QB64_WINDOWS
     // `isValidCygwinPipe()` checks for Cygwin-based stdout, which is good
     // enough to use directly. Otherwise we try to connect to the console we
-    // were started from (if we were).
+    // were started from (if there is one).
     //
     // If we're a console program and `AttachConsole()` did not work then we
     // will end up spawning our own console.
