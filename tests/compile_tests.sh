@@ -100,7 +100,7 @@ do
         cd "./tests/compile_tests/$category"
 
         # -m and -q make sure that we get predictable results
-        "../../../$QB64" "-f:OptimizeCppProgram=true" $compilerFlags -q -m -x "$testName.bas" -o "../../../$EXE" 1>"../../../$compileResultOutput"
+        "../../../$QB64" "-f:OptimizeCppProgram=true" "-f:StripDebugSymbols=false" $compilerFlags -q -m -x "$testName.bas" -o "../../../$EXE" 1>"../../../$compileResultOutput"
         ERR=$?
 
         popd >/dev/null
