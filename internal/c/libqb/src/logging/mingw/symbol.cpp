@@ -34,12 +34,12 @@ std::string libqb_log_resolve_symbol(const void *addr) {
             utf16_name[--len] = L'\0';
 
         // Load debug info
-        dbg::pe_symtab symtab;
+        pe_symtab symtab;
 
         try
         {
-            dbg::file pe(utf16_name);
-            dbg::pe_symtab temp(mod, pe);
+            file pe(utf16_name);
+            pe_symtab temp(mod, pe);
             temp.swap(symtab);
         }
         catch (const std::exception &ex)

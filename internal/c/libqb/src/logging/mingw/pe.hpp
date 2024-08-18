@@ -8,21 +8,17 @@
 
 #include <cstddef>
 
-namespace dbg 
+class file;
+
+struct pe_sink
 {
-    class file;
+    virtual ~pe_sink() { }
 
-    struct pe_sink
-    {
-        virtual ~pe_sink() { }
+    // Implementations should take a copy of name if needed, as the storage only
+    // exists for the duration of the on_symbol() call.
+    virtual void on_symbol(const char *name, std::size_t image_offset) = 0;
+};
 
-        // Implementations should take a copy of name if needed, as the storage only
-        // exists for the duration of the on_symbol() call.
-        virtual void on_symbol(const char *name, std::size_t image_offset) = 0;
-    };
-
-    void scan_mingw_pe_file(file &pe, pe_sink &sink);
-
-} // dbg
+void scan_mingw_pe_file(file &pe, pe_sink &sink);
 
 #endif // PE_HPP_0129_29062012
