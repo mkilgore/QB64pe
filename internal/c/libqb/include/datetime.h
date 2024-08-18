@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include "qbs.h"
 
-#ifdef QB64_LINUX
+#if defined(QB64_LINUX) || defined(QB64_WINDOWS)
 // Initializes the clock returned by 'GetTicks()' so that it starts from zero
 // Should be called at the very beginning of the program
 void clock_init();
