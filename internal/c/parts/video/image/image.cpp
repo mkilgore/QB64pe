@@ -16,9 +16,6 @@
 //
 //-----------------------------------------------------------------------------------------------------
 
-// Uncomment this to to print debug messages to stderr
-// #define IMAGE_DEBUG 1
-
 #include "image.h"
 #include "../../../libqb.h"
 #include "error_handle.h"
@@ -75,7 +72,7 @@ static uint32_t *image_scale(uint32_t *data, int32_t *xOut, int32_t *yOut, Image
 
         auto pixels = (uint32_t *)malloc(sizeof(uint32_t) * newX * newY);
         if (pixels) {
-            IMAGE_DEBUG_PRINT("Scaler %i: (%i x %i) -> (%i x %i)", (int)scaler, *xOut, *yOut, newX, newY);
+            image_log_info("Scaler %i: (%i x %i) -> (%i x %i)", (int)scaler, *xOut, *yOut, newX, newY);
 
             switch (scaler) {
             case ImageScaler::SXBR2:
@@ -103,7 +100,7 @@ static uint32_t *image_scale(uint32_t *data, int32_t *xOut, int32_t *yOut, Image
                 break;
 
             default:
-                IMAGE_DEBUG_PRINT("Unsupported scaler %i", (int)scaler);
+                image_log_warn("Unsupported scaler %i", (int)scaler);
                 free(pixels);
                 return data;
             }
@@ -296,27 +293,27 @@ static uint32_t *image_decode_from_file(const char *fileName, int32_t *xOut, int
     auto compOut = 0;
     auto isVG = false; // we will not use scalers for vector graphics
 
-    IMAGE_DEBUG_PRINT("Loading image from file %s", fileName);
+    image_log_info("Loading image from file %s", fileName);
 
     // Attempt to load file as a PCX first using sg_pcx
     auto pixels = pcx_load_file(fileName, xOut, yOut, &compOut);
-    IMAGE_DEBUG_PRINT("Image dimensions (sg_pcx) = (%i, %i)", *xOut, *yOut);
+    image_log_info("Image dimensions (sg_pcx) = (%i, %i)", *xOut, *yOut);
     if (!pixels) {
         // If sg_pcx failed to load, then use stb_image
         pixels = reinterpret_cast<uint32_t *>(stbi_load(fileName, xOut, yOut, &compOut, 4));
-        IMAGE_DEBUG_PRINT("Image dimensions (stb_image) = (%i, %i)", *xOut, *yOut);
+        image_log_info("Image dimensions (stb_image) = (%i, %i)", *xOut, *yOut);
 
         if (!pixels) {
             pixels = image_qoi_load_from_file(fileName, xOut, yOut, &compOut);
-            IMAGE_DEBUG_PRINT("Image dimensions (qoi) = (%i, %i)", *xOut, *yOut);
+            image_log_info("Image dimensions (qoi) = (%i, %i)", *xOut, *yOut);
 
             if (!pixels) {
                 pixels = image_svg_load_from_file(fileName, xOut, yOut, scaler, &compOut, &isVG);
-                IMAGE_DEBUG_PRINT("Image dimensions (nanosvg) = (%i, %i)", *xOut, *yOut);
+                image_log_info("Image dimensions (nanosvg) = (%i, %i)", *xOut, *yOut);
 
                 if (!pixels) {
                     pixels = curico_load_file(fileName, xOut, yOut, &compOut);
-                    IMAGE_DEBUG_PRINT("Image dimensions (sg_curico) = (%i, %i)", *xOut, *yOut);
+                    image_log_info("Image dimensions (sg_curico) = (%i, %i)", *xOut, *yOut);
 
                     if (!pixels)
                         return nullptr; // Return NULL if all attempts failed
@@ -344,27 +341,27 @@ static uint32_t *image_decode_from_memory(const uint8_t *data, size_t size, int3
     auto compOut = 0;
     auto isVG = false; // we will not use scalers for vector graphics
 
-    IMAGE_DEBUG_PRINT("Loading image from memory");
+    image_log_info("Loading image from memory");
 
     // Attempt to load file as a PCX first using sg_pcx
     auto pixels = pcx_load_memory(data, size, xOut, yOut, &compOut);
-    IMAGE_DEBUG_PRINT("Image dimensions (sg_pcx) = (%i, %i)", *xOut, *yOut);
+    image_log_info("Image dimensions (sg_pcx) = (%i, %i)", *xOut, *yOut);
     if (!pixels) {
         // If sg_pcx failed to load, then use stb_image
         pixels = reinterpret_cast<uint32_t *>(stbi_load_from_memory(reinterpret_cast<const stbi_uc *>(data), size, xOut, yOut, &compOut, 4));
-        IMAGE_DEBUG_PRINT("Image dimensions (stb_image) = (%i, %i)", *xOut, *yOut);
+        image_log_info("Image dimensions (stb_image) = (%i, %i)", *xOut, *yOut);
 
         if (!pixels) {
             pixels = image_qoi_load_from_memory(data, size, xOut, yOut, &compOut);
-            IMAGE_DEBUG_PRINT("Image dimensions (qoi) = (%i, %i)", *xOut, *yOut);
+            image_log_info("Image dimensions (qoi) = (%i, %i)", *xOut, *yOut);
 
             if (!pixels) {
                 pixels = image_svg_load_from_memory(data, size, xOut, yOut, scaler, &compOut, &isVG);
-                IMAGE_DEBUG_PRINT("Image dimensions (nanosvg) = (%i, %i)", *xOut, *yOut);
+                image_log_info("Image dimensions (nanosvg) = (%i, %i)", *xOut, *yOut);
 
                 if (!pixels) {
                     pixels = curico_load_memory(data, size, xOut, yOut, &compOut);
-                    IMAGE_DEBUG_PRINT("Image dimensions (sg_curico) = (%i, %i)", *xOut, *yOut);
+                    image_log_info("Image dimensions (sg_curico) = (%i, %i)", *xOut, *yOut);
 
                     if (!pixels)
                         return nullptr; // Return NULL if all attempts failed
@@ -396,7 +393,7 @@ static uint8_t *image_convert_8bpp(const uint32_t *src32, int32_t w, int32_t h, 
     // https://en.wikipedia.org/wiki/Ordered_dithering
     static const uint8_t bayerMatrix[16] = {0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5};
 
-    IMAGE_DEBUG_PRINT("Converting 32bpp image (%i, %i) to 8bpp", w, h);
+    image_log_info("Converting 32bpp image (%i, %i) to 8bpp", w, h);
 
     // Allocate memory for new image (8-bit indexed)
     auto pixels = (uint8_t *)malloc(w * h);
@@ -450,7 +447,7 @@ static uint8_t *image_convert_8bpp(const uint32_t *src32, int32_t w, int32_t h, 
 /// @param paletteOut A 256 color palette if the operation was successful. This cannot be NULL
 /// @return A pointer to a 8bpp raw image or NULL if operation failed
 static uint8_t *image_extract_8bpp(const uint32_t *src, int32_t w, int32_t h, uint32_t *paletteOut) {
-    IMAGE_DEBUG_PRINT("Extracting 8bpp image (%i, %i) from 32bpp", w, h);
+    image_log_info("Extracting 8bpp image (%i, %i) from 32bpp", w, h);
 
     std::unordered_map<uint32_t, int> colorMap;
 
@@ -468,7 +465,7 @@ static uint8_t *image_extract_8bpp(const uint32_t *src, int32_t w, int32_t h, ui
         if (colorMap.count(srcColor) == 0) {
             // If we reached here, then the color is not in our table
             if (uniqueColors > 255) {
-                IMAGE_DEBUG_PRINT("Image has more than %i unique colors", uniqueColors);
+                image_log_error("Image has more than %i unique colors", uniqueColors);
                 free(pixels);
                 return nullptr; // Exit with failure if we have > 256 colors
             }
@@ -483,7 +480,7 @@ static uint8_t *image_extract_8bpp(const uint32_t *src, int32_t w, int32_t h, ui
         }
     }
 
-    IMAGE_DEBUG_PRINT("Unique colors = %i", uniqueColors);
+    image_log_info("Unique colors = %i", uniqueColors);
 
     return pixels;
 }
@@ -499,7 +496,7 @@ static void image_remap_palette(uint8_t *src, int32_t w, int32_t h, const uint32
     static uint32_t palMap[256];
     ZERO_VARIABLE(palMap);
 
-    IMAGE_DEBUG_PRINT("Remapping 8bpp image (%i, %i) palette", w, h);
+    image_log_info("Remapping 8bpp image (%i, %i) palette", w, h);
 
     // Match the palette
     for (auto x = 0; x < 256; x++) {
@@ -538,30 +535,30 @@ int32_t func__loadimage(qbs *qbsFileName, int32_t bpp, qbs *qbsRequirements, int
     auto scaler = ImageScaler::NONE; // default to no scaling
 
     // Handle special cases and set the above flags if required
-    IMAGE_DEBUG_PRINT("bpp = %i, passed = 0x%X", bpp, passed);
+    image_log_info("bpp = %i, passed = 0x%X", bpp, passed);
     if (passed & 1) {
         if (bpp == 33) { // hardware image?
             isHardwareImage = true;
             bpp = 32;
-            IMAGE_DEBUG_PRINT("bpp = 0x%X", bpp);
+            image_log_info("bpp = 0x%X", bpp);
         } else if (bpp == 257) { // adaptive palette?
             isRemapPalette = false;
             bpp = 256;
-            IMAGE_DEBUG_PRINT("bpp = 0x%X", bpp);
+            image_log_info("bpp = 0x%X", bpp);
         }
 
         if ((bpp != 32) && (bpp != 256)) { // invalid BPP?
-            IMAGE_DEBUG_PRINT("Invalid bpp (0x%X)", bpp);
+            image_log_error("Invalid bpp (0x%X)", bpp);
             error(QB_ERROR_ILLEGAL_FUNCTION_CALL);
             return INVALID_IMAGE_HANDLE;
         }
     } else {
         if (write_page->bits_per_pixel < 32) { // default to 8bpp for all legacy screen modes
             bpp = 256;
-            IMAGE_DEBUG_PRINT("Defaulting to 8bpp");
+            image_log_info("Defaulting to 8bpp");
         } else { // default to 32bpp for everything else
             bpp = 32;
-            IMAGE_DEBUG_PRINT("Defaulting to 32bpp");
+            image_log_info("Defaulting to 32bpp");
         }
     }
 
@@ -571,27 +568,27 @@ int32_t func__loadimage(qbs *qbsFileName, int32_t bpp, qbs *qbsRequirements, int
         std::string requirements(reinterpret_cast<char *>(qbsRequirements->chr), qbsRequirements->len);
         std::transform(requirements.begin(), requirements.end(), requirements.begin(), [](unsigned char c) { return std::toupper(c); });
 
-        IMAGE_DEBUG_PRINT("Parsing requirements string: %s", requirements.c_str());
+        image_log_info("Parsing requirements string: %s", requirements.c_str());
 
         if (requirements.find("HARDWARE") != std::string::npos && bpp == 32) {
             isHardwareImage = true;
-            IMAGE_DEBUG_PRINT("Hardware image selected");
+            image_log_info("Hardware image selected");
         } else if (requirements.find("ADAPTIVE") != std::string::npos && bpp == 256) {
             isRemapPalette = false;
-            IMAGE_DEBUG_PRINT("Adaptive palette selected");
+            image_log_info("Adaptive palette selected");
         }
 
         if (requirements.find("MEMORY") != std::string::npos) {
             isLoadFromMemory = true;
-            IMAGE_DEBUG_PRINT("Loading image from memory");
+            image_log_info("Loading image from memory");
         }
 
         // Parse scaler string
         for (auto i = 0; i < GET_ARRAY_SIZE(g_ImageScalerName); i++) {
-            IMAGE_DEBUG_PRINT("Checking for: %s", g_ImageScalerName[i]);
+            image_log_info("Checking for: %s", g_ImageScalerName[i]);
             if (requirements.find(g_ImageScalerName[i]) != std::string::npos) {
                 scaler = (ImageScaler)i;
-                IMAGE_DEBUG_PRINT("%s scaler selected", g_ImageScalerName[(int)scaler]);
+                image_log_info("%s scaler selected", g_ImageScalerName[(int)scaler]);
                 break;
             }
         }
@@ -619,7 +616,7 @@ int32_t func__loadimage(qbs *qbsFileName, int32_t bpp, qbs *qbsRequirements, int
 
     // Convert image to 8bpp if requested by the user
     if (bpp == 256) {
-        IMAGE_DEBUG_PRINT("Entering 8bpp path");
+        image_log_info("Entering 8bpp path");
 
         i = func__newimage(x, y, 256, 1);
         if (i == INVALID_IMAGE_HANDLE) {
@@ -664,7 +661,7 @@ int32_t func__loadimage(qbs *qbsFileName, int32_t bpp, qbs *qbsRequirements, int
             free(palette);
         }
     } else {
-        IMAGE_DEBUG_PRINT("Entering 32bpp path");
+        image_log_info("Entering 32bpp path");
 
         i = func__newimage(x, y, 32, 1);
         if (i == INVALID_IMAGE_HANDLE) {
@@ -679,14 +676,14 @@ int32_t func__loadimage(qbs *qbsFileName, int32_t bpp, qbs *qbsRequirements, int
 
     // This only executes if bpp is 32
     if (isHardwareImage) {
-        IMAGE_DEBUG_PRINT("Making hardware image");
+        image_log_info("Making hardware image");
 
         auto iHardware = func__copyimage(i, 33, 1);
         sub__freeimage(i, 1);
         i = iHardware;
     }
 
-    IMAGE_DEBUG_PRINT("Returning handle value = %i", i);
+    image_log_info("Returning handle value = %i", i);
 
     return i;
 }
@@ -704,14 +701,14 @@ void sub__saveimage(qbs *qbsFileName, int32_t imageHandle, qbs *qbsRequirements,
         return;
 
     if (!qbsFileName->len) { // empty file names not allowed
-        IMAGE_DEBUG_PRINT("Empty file name");
+        image_log_error("Empty file name");
         error(QB_ERROR_BAD_FILE_NAME);
         return;
     }
 
     if (passed & 1) {
         // Check and validate image handle
-        IMAGE_DEBUG_PRINT("Validating handle %i", imageHandle);
+        image_log_info("Validating handle %i", imageHandle);
 
         if (imageHandle >= 0) {
             validatepage(imageHandle);
@@ -730,7 +727,7 @@ void sub__saveimage(qbs *qbsFileName, int32_t imageHandle, qbs *qbsRequirements,
         }
     } else {
         // Use default image handle
-        IMAGE_DEBUG_PRINT("Using default handle");
+        image_log_info("Using default handle");
 
         imageHandle = -func__display();
 
@@ -745,7 +742,7 @@ void sub__saveimage(qbs *qbsFileName, int32_t imageHandle, qbs *qbsRequirements,
         }
     }
 
-    IMAGE_DEBUG_PRINT("Using image handle %i", imageHandle);
+    image_log_info("Using image handle %i", imageHandle);
 
     auto format = SaveFormat::PNG; // we always default to PNG
 
@@ -754,19 +751,19 @@ void sub__saveimage(qbs *qbsFileName, int32_t imageHandle, qbs *qbsRequirements,
         std::string requirements(reinterpret_cast<char *>(qbsRequirements->chr), qbsRequirements->len);
         std::transform(requirements.begin(), requirements.end(), requirements.begin(), [](unsigned char c) { return std::tolower(c); });
 
-        IMAGE_DEBUG_PRINT("Parsing requirements string: %s", requirements.c_str());
+        image_log_info("Parsing requirements string: %s", requirements.c_str());
 
         for (auto i = 0; i < GET_ARRAY_SIZE(formatName); i++) {
-            IMAGE_DEBUG_PRINT("Checking for: %s", formatName[i]);
+            image_log_info("Checking for: %s", formatName[i]);
             if (requirements.find(formatName[i]) != std::string::npos) {
                 format = (SaveFormat)i;
-                IMAGE_DEBUG_PRINT("Found: %s", formatName[(int)format]);
+                image_log_info("Found: %s", formatName[(int)format]);
                 break;
             }
         }
     }
 
-    IMAGE_DEBUG_PRINT("Format selected: %s", formatName[(int)format]);
+    image_log_info("Format selected: %s", formatName[(int)format]);
 
     std::string fileName(reinterpret_cast<char *>(qbsFileName->chr), qbsFileName->len);
     filepath_fix_directory(fileName);
@@ -776,7 +773,7 @@ void sub__saveimage(qbs *qbsFileName, int32_t imageHandle, qbs *qbsRequirements,
         auto fileExtension = fileName.substr(fileName.length() - 4);
         std::transform(fileExtension.begin(), fileExtension.end(), fileExtension.begin(), [](unsigned char c) { return std::tolower(c); });
 
-        IMAGE_DEBUG_PRINT("File extension: %s", fileExtension.c_str());
+        image_log_info("File extension: %s", fileExtension.c_str());
 
         int i;
         for (i = 0; i < GET_ARRAY_SIZE(formatName); i++) {
@@ -785,25 +782,25 @@ void sub__saveimage(qbs *qbsFileName, int32_t imageHandle, qbs *qbsRequirements,
             formatExtension = ".";
             formatExtension.append(formatName[i]);
 
-            IMAGE_DEBUG_PRINT("Check extension name: %s", formatExtension.c_str());
+            image_log_info("Check extension name: %s", formatExtension.c_str());
 
             if (fileExtension == formatExtension) {
-                IMAGE_DEBUG_PRINT("Extension (%s) matches with format %i", formatExtension.c_str(), i);
+                image_log_info("Extension (%s) matches with format %i", formatExtension.c_str(), i);
                 format = (SaveFormat)i;
-                IMAGE_DEBUG_PRINT("Format selected by extension: %s", formatName[(int)format]);
+                image_log_info("Format selected by extension: %s", formatName[(int)format]);
                 break;
             }
         }
 
         if (i >= GET_ARRAY_SIZE(formatName)) { // no matches
-            IMAGE_DEBUG_PRINT("No matching extension. Adding .%s", formatName[(int)format]);
+            image_log_info("No matching extension. Adding .%s", formatName[(int)format]);
 
             fileName.append(".");
             fileName.append(formatName[(int)format]);
         }
     } else {
         // Simply add the selected format's extension
-        IMAGE_DEBUG_PRINT("Adding extension: .%s", formatName[(int)format]);
+        image_log_info("Adding extension: .%s", formatName[(int)format]);
 
         fileName.append(".");
         fileName.append(formatName[(int)format]);
@@ -814,7 +811,7 @@ void sub__saveimage(qbs *qbsFileName, int32_t imageHandle, qbs *qbsRequirements,
     int32_t width, height;
 
     if (img[imageHandle].text) {
-        IMAGE_DEBUG_PRINT("Rendering text surface to RGBA");
+        image_log_info("Rendering text surface to RGBA");
 
         auto const fontWidth = 8;
         auto fontHeight = 16;
@@ -867,7 +864,7 @@ void sub__saveimage(qbs *qbsFileName, int32_t imageHandle, qbs *qbsRequirements,
         pixels.resize(width * height);
 
         if (img[imageHandle].bits_per_pixel == 32) { // BGRA pixels
-            IMAGE_DEBUG_PRINT("Converting BGRA surface to RGBA");
+            image_log_info("Converting BGRA surface to RGBA");
 
             auto p = img[imageHandle].offset32;
 
@@ -876,7 +873,7 @@ void sub__saveimage(qbs *qbsFileName, int32_t imageHandle, qbs *qbsRequirements,
                 ++p;
             }
         } else { // indexed pixels
-            IMAGE_DEBUG_PRINT("Converting BGRA indexed surface to RGBA");
+            image_log_info("Converting BGRA indexed surface to RGBA");
             auto p = img[imageHandle].offset;
 
             for (size_t i = 0; i < pixels.size(); i++) {
@@ -886,13 +883,13 @@ void sub__saveimage(qbs *qbsFileName, int32_t imageHandle, qbs *qbsRequirements,
         }
     }
 
-    IMAGE_DEBUG_PRINT("Saving to: %s (%i x %i), %llu pixels, %s", fileName.c_str(), width, height, pixels.size(), formatName[(int)format]);
+    image_log_info("Saving to: %s (%i x %i), %llu pixels, %s", fileName.c_str(), width, height, pixels.size(), formatName[(int)format]);
 
     switch (format) {
     case SaveFormat::PNG: {
         stbi_write_png_compression_level = 100;
         if (!stbi_write_png(fileName.c_str(), width, height, sizeof(uint32_t), pixels.data(), 0)) {
-            IMAGE_DEBUG_PRINT("stbi_write_png() failed");
+            image_log_error("stbi_write_png() failed");
             error(QB_ERROR_ILLEGAL_FUNCTION_CALL);
         }
     } break;
@@ -905,34 +902,34 @@ void sub__saveimage(qbs *qbsFileName, int32_t imageHandle, qbs *qbsRequirements,
         desc.colorspace = QOI_SRGB;
 
         if (!qoi_write(fileName.c_str(), pixels.data(), &desc)) {
-            IMAGE_DEBUG_PRINT("qoi_write() failed");
+            image_log_error("qoi_write() failed");
             error(QB_ERROR_ILLEGAL_FUNCTION_CALL);
         }
     } break;
 
     case SaveFormat::BMP: {
         if (!stbi_write_bmp(fileName.c_str(), width, height, sizeof(uint32_t), pixels.data())) {
-            IMAGE_DEBUG_PRINT("stbi_write_bmp() failed");
+            image_log_error("stbi_write_bmp() failed");
             error(QB_ERROR_ILLEGAL_FUNCTION_CALL);
         }
     } break;
 
     case SaveFormat::TGA: {
         if (!stbi_write_tga(fileName.c_str(), width, height, sizeof(uint32_t), pixels.data())) {
-            IMAGE_DEBUG_PRINT("stbi_write_tga() failed");
+            image_log_error("stbi_write_tga() failed");
             error(QB_ERROR_ILLEGAL_FUNCTION_CALL);
         }
     } break;
 
     case SaveFormat::JPG: {
         if (!stbi_write_jpg(fileName.c_str(), width, height, sizeof(uint32_t), pixels.data(), 100)) {
-            IMAGE_DEBUG_PRINT("stbi_write_jpg() failed");
+            image_log_error("stbi_write_jpg() failed");
             error(QB_ERROR_ILLEGAL_FUNCTION_CALL);
         }
     } break;
 
     case SaveFormat::HDR: {
-        IMAGE_DEBUG_PRINT("Converting RGBA to linear float data");
+        image_log_info("Converting RGBA to linear float data");
 
         const auto HDRComponents = 4;
 
@@ -951,7 +948,7 @@ void sub__saveimage(qbs *qbsFileName, int32_t imageHandle, qbs *qbsRequirements,
         }
 
         if (!stbi_write_hdr(fileName.c_str(), width, height, HDRComponents, HDRPixels.data())) {
-            IMAGE_DEBUG_PRINT("stbi_write_hdr() failed");
+            image_log_error("stbi_write_hdr() failed");
             error(QB_ERROR_ILLEGAL_FUNCTION_CALL);
         }
     } break;
@@ -962,20 +959,20 @@ void sub__saveimage(qbs *qbsFileName, int32_t imageHandle, qbs *qbsRequirements,
             jo_gif_frame(&gif, reinterpret_cast<unsigned char *>(pixels.data()), 0, false);
             jo_gif_end(&gif);
         } else {
-            IMAGE_DEBUG_PRINT("jo_gif_start() failed");
+            image_log_error("jo_gif_start() failed");
             error(QB_ERROR_ILLEGAL_FUNCTION_CALL);
         }
     } break;
 
     case SaveFormat::ICO: {
         if (!curico_save_file(fileName.c_str(), width, height, sizeof(uint32_t), pixels.data())) {
-            IMAGE_DEBUG_PRINT("curico_save_file() failed");
+            image_log_error("curico_save_file() failed");
             error(QB_ERROR_ILLEGAL_FUNCTION_CALL);
         }
     } break;
 
     default:
-        IMAGE_DEBUG_PRINT("Save handler not implemented");
+        image_log_error("Save handler not implemented");
         error(QB_ERROR_INTERNAL_ERROR);
     }
 }
