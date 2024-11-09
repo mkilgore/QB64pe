@@ -36,7 +36,6 @@ DEFLNG A-Z
 '-------- Optional IDE Component (1/2) --------
 '$INCLUDE:'ide\ide_global.bas'
 
-
 DIM SHARED NoExeSaved AS INTEGER
 
 DIM SHARED ColorSet, colorRecompileAttempts, colorSetDesired
@@ -929,20 +928,52 @@ IF C = 9 THEN 'run
             GOTO sendcommand
         END IF
 
-
-
-        IF os$ = "WIN" THEN SHELL _DONTWAIT QuotedFilename$(CHR$(34) + lastBinaryGenerated$ + CHR$(34)) + ModifyCOMMAND$
-        IF path.exe$ = "" THEN path.exe$ = "./"
-        IF os$ = "LNX" THEN
-            IF LEFT$(lastBinaryGenerated$, LEN(path.exe$)) = path.exe$ THEN
-                SHELL _DONTWAIT QuotedFilename$(lastBinaryGenerated$) + ModifyCOMMAND$
-            ELSE
-                SHELL _DONTWAIT QuotedFilename$(path.exe$ + lastBinaryGenerated$) + ModifyCOMMAND$
-            END IF
+        IF LoggingEnabled THEN
+            ENVIRON "QB64PE_LOG_HANDLERS=console"
+            ENVIRON "QB64PE_LOG_SCOPES=qb64,libqb,libqb-image,libqb-audio"
+        ELSE
+            ENVIRON "QB64PE_LOG_HANDLERS="
+            ENVIRON "QB64PE_LOG_SCOPES="
         END IF
-        IF path.exe$ = "./" THEN path.exe$ = ""
+
+        IF os$ = "WIN" THEN
+            IF ConsoleOn OR LoggingEnabled THEN
+                PrePend$ = "cmd /c"
+            ELSE
+                PrePend$ = ""
+            END IF
+
+            SHELL _DONTWAIT PrePend$ + QuotedFilename$(CHR$(34) + lastBinaryGenerated$ + CHR$(34)) + ModifyCOMMAND$
+        ELSEIF os$ = "LNX" THEN
+            IF path.exe$ = "" THEN path.exe$ = "./"
+
+            IF ConsoleOn OR LoggingEnabled THEN
+                cmdLine$ = DefaultTerminal
+
+                IF LEFT$(lastBinaryGenerated$, LEN(path.exe$)) = path.exe$ THEN
+                    cmdLine$ = StrReplace$(cmdLine$, "$$", QuotedFilename$(lastBinaryGenerated$))
+                ELSE
+                    cmdLine$ = StrReplace$(cmdLine$, "$$", QuotedFilename$(path.exe$ + lastBinaryGenerated$))
+                END IF
+
+                cmdLine$ = StrReplace$(cmdLine$, "$@", ModifyCOMMAND$)
+
+                SHELL _DONTWAIT cmdLine$
+            ELSE
+                IF LEFT$(lastBinaryGenerated$, LEN(path.exe$)) = path.exe$ THEN
+                    SHELL _DONTWAIT PrePend$ + QuotedFilename$(lastBinaryGenerated$) + ModifyCOMMAND$
+                ELSE
+                    SHELL _DONTWAIT PrePend$ + QuotedFilename$(path.exe$ + lastBinaryGenerated$) + ModifyCOMMAND$
+                END IF
+            END IF
+
+            IF path.exe$ = "./" THEN path.exe$ = ""
+        END IF
     ELSE
-        IF os$ = "WIN" THEN SHELL QuotedFilename$(CHR$(34) + lastBinaryGenerated$ + CHR$(34)) + ModifyCOMMAND$
+        ENVIRON "QB64PE_LOG_HANDLERS=console"
+        ENVIRON "QB64PE_LOG_SCOPES=qb64,libqb,libqb-image,libqb-audio"
+
+        IF os$ = "WIN" THEN SHELL "cmd /c " + QuotedFilename$(CHR$(34) + lastBinaryGenerated$ + CHR$(34)) + ModifyCOMMAND$
         IF path.exe$ = "" THEN path.exe$ = "./"
         IF os$ = "LNX" THEN
             IF LEFT$(lastBinaryGenerated$, LEN(path.exe$)) = path.exe$ THEN
@@ -23830,6 +23861,7 @@ END FUNCTION
 '$INCLUDE:'utilities\type.bas'
 '$INCLUDE:'utilities\give_error.bas'
 '$INCLUDE:'utilities\format.bas'
+'$include:'utilities\terminal.bas'
 '$INCLUDE:'emit\logging.bas'
 
 DEFLNG A-Z
