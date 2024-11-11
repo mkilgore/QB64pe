@@ -23,6 +23,7 @@
 #include "miniaudio.h"
 #include "mutex.h"
 #include "qbs.h"
+#include "vfs.h"
 
 /// @brief The top-level class that implements the QB64-PE audio engine.
 struct AudioEngine {
@@ -1853,6 +1854,7 @@ struct AudioEngine {
     std::vector<SoundHandle *> soundHandles;            // this is the audio handle list used by the engine and by everything else
     int32_t lowestFreeHandle;                           // this is the lowest handle then was recently freed. We'll start checking for free handles from here
     BufferMap bufferMap;                                // this is used to keep track of and manage memory used by 'in-memory' sound files
+    ma_vfs *vfs;                                        // This is an ma_vfs backed by the BufferMap
 
     // Delete copy and move constructors and assignments
     AudioEngine(const AudioEngine &) = delete;
@@ -1871,6 +1873,8 @@ struct AudioEngine {
         psgVoices.fill(INVALID_SOUND_HANDLE_INTERNAL);  // should not use INVALID_SOUND_HANDLE here
         internalSndRaw = INVALID_SOUND_HANDLE_INTERNAL; // should not use INVALID_SOUND_HANDLE here
         lowestFreeHandle = 0;
+
+        vfs = pe_vfs_create(&bufferMap);
     }
 
     /// @brief Allocates a sound handle. It will return -1 on error. Handle 0 is used internally for Sound and Play and thus cannot be used by the user.
@@ -2181,6 +2185,7 @@ struct AudioEngine {
         maResourceManagerConfig = ma_resource_manager_config_init();
         AudioEngineAttachCustomBackendVTables(&maResourceManagerConfig);
         maResourceManagerConfig.pCustomDecodingBackendUserData = NULL; // <- pUserData parameter of each function in the decoding backend vtables
+        maResourceManagerConfig.pVFS = vfs;
 
         maResult = ma_resource_manager_init(&maResourceManagerConfig, &maResourceManager);
         if (maResult != MA_SUCCESS) {
@@ -2291,42 +2296,14 @@ struct AudioEngine {
     /// @param handle A valid sound handle.
     /// @return MA_SUCCESS if successful. Else, a valid ma_result.
     ma_result InitializeSoundFromMemory(const void *buffer, size_t size, int32_t handle) {
-        if (!IsHandleValid(handle) || soundHandles[handle]->maDecoder || !buffer || !size)
+        if (!IsHandleValid(handle))
             return MA_INVALID_ARGS;
 
-        soundHandles[handle]->maDecoder = new ma_decoder(); // allocate and zero memory
-        if (!soundHandles[handle]->maDecoder) {
-            AUDIO_DEBUG_PRINT("Failed to allocate memory for miniaudio decoder");
-            return MA_OUT_OF_MEMORY;
-        }
+        std::string fname = std::to_string(soundHandles[handle]->bufferKey);
 
-        // Setup the decoder & attach the custom backed vtables
-        soundHandles[handle]->maDecoderConfig = ma_decoder_config_init_default();
-        AudioEngineAttachCustomBackendVTables(&soundHandles[handle]->maDecoderConfig);
-        soundHandles[handle]->maDecoderConfig.sampleRate = ma_engine_get_sample_rate(&maEngine);
-
-        maResult = ma_decoder_init_memory(buffer, size, &soundHandles[handle]->maDecoderConfig,
-                                          soundHandles[handle]->maDecoder); // initialize the decoder
-        if (maResult != MA_SUCCESS) {
-            delete soundHandles[handle]->maDecoder;
-            soundHandles[handle]->maDecoder = nullptr;
-            AUDIO_DEBUG_PRINT("Error %i: failed to initialize miniaudio decoder", maResult);
-            return maResult;
-        }
-
-        // Finally, load the sound as a data source
-        maResult =
-            ma_sound_init_from_data_source(&maEngine, soundHandles[handle]->maDecoder, soundHandles[handle]->maFlags, NULL, &soundHandles[handle]->maSound);
-
-        if (maResult != MA_SUCCESS) {
-            ma_decoder_uninit(soundHandles[handle]->maDecoder);
-            delete soundHandles[handle]->maDecoder;
-            soundHandles[handle]->maDecoder = nullptr;
-            AUDIO_DEBUG_PRINT("Error %i: failed to initialize sound", maResult);
-            return maResult;
-        }
-
-        return MA_SUCCESS;
+        maResult = ma_sound_init_from_file(&maEngine, fname.c_str(), soundHandles[handle]->maFlags, NULL,
+                                                        NULL, &soundHandles[handle]->maSound);
+        return maResult;
     }
 };
 
@@ -2659,10 +2636,22 @@ int32_t func__sndopen(qbs *qbsFileName, qbs *qbsRequirements, int32_t passed) {
         std::string fileName(reinterpret_cast<char const *>(qbsFileName->chr), qbsFileName->len);
 
         AUDIO_DEBUG_PRINT("Loading sound from file '%s'", fileName.c_str());
+        std::FILE *fp = std::fopen(fileName.c_str(), "rb");
+        std::string contents;
+        if (fp) {
+            std::fseek(fp, 0, SEEK_END);
+            contents.resize(std::ftell(fp));
+            std::rewind(fp);
+            std::fread(&contents[0], 1, contents.size(), fp);
+            std::fclose(fp);
+            AUDIO_DEBUG_PRINT("Loaded sound '%s', length: %zd", fileName.c_str(), contents.length());
+        }
 
-        // Forward the request to miniaudio to open the sound file
-        audioEngine.maResult = ma_sound_init_from_file(&audioEngine.maEngine, filepath_fix_directory(fileName), audioEngine.soundHandles[handle]->maFlags, NULL,
-                                                       NULL, &audioEngine.soundHandles[handle]->maSound);
+        // Configure a miniaudio decoder to load the sound from memory
+        audioEngine.soundHandles[handle]->bufferKey = std::hash<std::string>{}(contents);                        // make a unique key and save it
+        audioEngine.bufferMap.AddBuffer(contents.c_str(), contents.length(), audioEngine.soundHandles[handle]->bufferKey); // make a copy of the buffer
+        auto [buffer, bufferSize] = audioEngine.bufferMap.GetBuffer(audioEngine.soundHandles[handle]->bufferKey);         // get the buffer pointer and size
+        audioEngine.maResult = audioEngine.InitializeSoundFromMemory(buffer, bufferSize, handle);                         // create the ma_sound
     }
 
     // If the sound failed to initialize, then free the handle and return INVALID_SOUND_HANDLE

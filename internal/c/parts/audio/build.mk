@@ -1,7 +1,8 @@
 
 MINIAUDIO_SRCS := \
 	audio.cpp \
-	framework.cpp
+	framework.cpp \
+	vfs.cpp
 
 MINIAUDIO_OBJS := $(patsubst %.cpp,$(PATH_INTERNAL_C)/parts/audio/%.o,$(MINIAUDIO_SRCS))
 

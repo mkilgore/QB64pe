@@ -151,7 +151,7 @@ class BufferMap {
         auto it = buffers.find(key);
 
         if (it != buffers.end()) {
-            AUDIO_DEBUG_PRINT("Returning buffer of size %llu", it->second.data.size());
+            // AUDIO_DEBUG_PRINT("Returning buffer of size %llu", it->second.data.size());
 
             return {it->second.data.data(), it->second.data.size()};
         }
