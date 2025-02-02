@@ -137,11 +137,7 @@ struct onkey_struct {
     qbs *text;
 };
 
-struct byte_element_struct {
-    uint64 offset;
-    int32 length;
-};
-
+#    include "byte-element.h"
 #    include "mem.h"
 
 #endif // INC_COMMON_CPP

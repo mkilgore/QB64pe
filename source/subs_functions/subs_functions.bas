@@ -4225,6 +4225,46 @@ SUB reginternal
     id.hr_syntax = "_LOGMINLEVEL"
     regid
 
+    clearid
+    id.n = "_ShellStream"
+    id.subfunc = 1
+    id.callname = "func__shellstream"
+    id.args = 2
+    id.arg = MKL$(STRINGTYPE - ISPOINTER) + MKL$(LONGTYPE - ISPOINTER)
+    id.ret = LONGTYPE - ISPOINTER
+    id.hr_syntax = "_ShellStream(" + CHR$(34) + "command" + CHR$(34) + ", flags)"
+    regid
+
+    clearid
+    id.n = "_InStream"
+    id.subfunc = 1
+    id.callname = "func__instream"
+    id.args = 1
+    id.arg = MKL$(LONGTYPE - ISPOINTER)
+    id.ret = LONGTYPE - ISPOINTER
+    id.hr_syntax = "_InStream(shellstream)"
+    regid
+
+    clearid
+    id.n = "_OutStream"
+    id.subfunc = 1
+    id.callname = "func__outstream"
+    id.args = 1
+    id.arg = MKL$(LONGTYPE - ISPOINTER)
+    id.ret = LONGTYPE - ISPOINTER
+    id.hr_syntax = "_OutStream(shellstream)"
+    regid
+
+    clearid
+    id.n = "_ErrorStream"
+    id.subfunc = 1
+    id.callname = "func__errorstream"
+    id.args = 1
+    id.arg = MKL$(LONGTYPE - ISPOINTER)
+    id.ret = LONGTYPE - ISPOINTER
+    id.hr_syntax = "_ErrorStream(shellstream)"
+    regid
+
     reginternalsubfunc = 0
 END SUB
 

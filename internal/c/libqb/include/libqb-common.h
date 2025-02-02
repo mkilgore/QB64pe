@@ -60,6 +60,8 @@
 #define QB_FALSE 0
 #define QB_TRUE -1
 
+#define TO_QB_BOOL(x) ((x)? QB_TRUE: QB_FALSE)
+
 #ifndef _countof
 #    ifdef __cplusplus
 #        include <cstddef>
