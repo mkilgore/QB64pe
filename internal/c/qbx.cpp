@@ -28,6 +28,7 @@
 #include "qbs.h"
 #include "rounding.h"
 #include "shell.h"
+#include "shellstream.h"
 
 extern int32 func__cinp(int32 toggle, int32 passed); // Console INP scan code reader
 extern int func__capslock();

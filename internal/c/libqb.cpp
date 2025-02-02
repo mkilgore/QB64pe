@@ -44,7 +44,9 @@
 #include "qbs.h"
 #include "rounding.h"
 #include "shell.h"
+#include "shellstream.h"
 #include "thread.h"
+#include "stream.h"
 
 // These are here because they are used in func__loadfont()
 #include <algorithm>
@@ -415,13 +417,6 @@ int64 display_frame_order_next = 1;
 int64 last_rendered_hardware_display_frame_order = 0;
 int64 last_hardware_display_frame_order = 0;
 
-enum class special_handle_type {
-    Invalid,
-    Stream,
-    Host,
-    Http,
-};
-
 // Special Handle system
 //---------------------
 // Purpose: Manage handles to custom QB64 interfaces alongside the standard QB file handle indexing
@@ -432,9 +427,30 @@ struct special_handle_struct {
     //
     // Http streams use this as an EOF flag
     ptrszint index;
+    special_handle *hand;
 };
 
 list *special_handles = NULL;
+
+void special_handle_custom_open(special_handle *hand)
+{
+    int32_t handle = list_add(special_handles);
+    hand->id = -(handle + 1);
+
+    special_handle_struct *s = (special_handle_struct *)list_get(special_handles, handle);
+    s->type = special_handle_type::Custom;
+    s->hand = hand;
+}
+
+void special_handle_close(special_handle *hand)
+{
+    int32_t id = -(hand->id + 1);
+
+    libqb_log_info("ID removed: %d", id);
+    hand->close();
+    list_remove(special_handles, id);
+}
+
 
 enum class stream_type {
     Tcp,
@@ -14463,6 +14479,10 @@ void sub_close(int32 i2, int32 passed) {
                 libqb_http_close(x);
                 break;
 
+            case special_handle_type::Custom:
+                special_handle_close(sh->hand);
+                break;
+
             case special_handle_type::Invalid:
                 // TODO: Check if anything needs to be done here
                 break;
@@ -16167,6 +16187,12 @@ void sub_get(int32 i, int64 offset, void *element, int32 passed) {
 
             break;
 
+        case special_handle_type::Custom:
+            ele = (byte_element_struct *)element;
+
+            sh->hand->get(offset, ele, passed);
+            break;
+
         default:
             error(52);
             break;
@@ -16282,6 +16308,7 @@ void sub_get2(int32 i, int64 offset, qbs *str, int32 passed) {
         static special_handle_struct *sh;
         sh = (special_handle_struct *)list_get(special_handles, x);
         if (!sh) {
+            libqb_log_info("Special handle not found!");
             error(52);
             return;
         }
@@ -16314,7 +16341,12 @@ void sub_get2(int32 i, int64 offset, qbs *str, int32 passed) {
             qbs_set(str, tqbs);
             break;
 
+        case special_handle_type::Custom:
+            sh->hand->get2(offset, str, passed);
+            break;
+
         default:
+            libqb_log_info("Special handle not found two!");
             error(52);
             break;
         }
@@ -16468,6 +16500,11 @@ void sub_put(int32 i, int64 offset, void *element, int32 passed) {
             st = (stream_struct *)sh->index;
             ele = (byte_element_struct *)element;
             stream_out(st, (void *)ele->offset, ele->length);
+            break;
+
+        case special_handle_type::Custom:
+            ele = (byte_element_struct *)element;
+            sh->hand->put(offset, ele, passed);
             break;
 
         default:
@@ -18078,6 +18115,9 @@ int64 func_lof(int32 i) {
 
             return length;
 
+        case special_handle_type::Custom:
+            return sh->hand->lof();
+
         default:
             error(52);
             return 0;
@@ -18149,6 +18189,9 @@ int32 func_eof(int32 i) {
                 return 0;
 
             return -1;
+
+        case special_handle_type::Custom:
+            return sh->hand->eof();
 
         default:
             error(52);
@@ -23221,6 +23264,7 @@ void connection_close(ptrszint i) {
         list_remove(special_handles, list_get_index(special_handles, sh));
         break;
 
+    case special_handle_type::Custom:
     case special_handle_type::Invalid:
         // TODO: Check if anything needs to be done here
         break;
@@ -23587,7 +23631,9 @@ qbs *func__connectionaddress(int32 i) {
 
             return FUNC__DECODEURL(str);
 
-            break;
+        case special_handle_type::Custom:
+            sh->hand->connectionaddress(str);
+            return str;
 
         case special_handle_type::Invalid:
             // TODO: Check if anything needs to be done here
@@ -23644,7 +23690,9 @@ int32 func__connected(int32 i) {
 
         case special_handle_type::Http:
             return libqb_http_connected(x) ? -1 : 0;
-            break;
+
+        case special_handle_type::Custom:
+            return sh->hand->connected();
 
         case special_handle_type::Invalid:
             // TODO: Check if anything needs to be done here
