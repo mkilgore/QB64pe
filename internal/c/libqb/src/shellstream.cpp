@@ -133,7 +133,7 @@ class stream_handle_in final : public special_handle {
             if (!bytesAvail)
                 return;
 
-            success = ReadFile(fd, (void *)b, sizeof(b) > bytesAvail? sizeof(b): bytesAvail, &bytesRead, NULL);
+            success = ReadFile(fd, (void *)b, (sizeof(b) < bytesAvail)? sizeof(b): bytesAvail, &bytesRead, NULL);
             if (success)
                 libqb_buffer_write(&buf, (const char *)b, bytesRead);
         }
@@ -162,7 +162,6 @@ class stream_handle_in final : public special_handle {
     {
         (void)offset;
 
-        libqb_log_info("Entered get2 override!");
         // Offset is not supported
         if (passed) {
             error(QB_ERROR_BAD_FILE_NAME_OR_NUMBER);
@@ -422,7 +421,6 @@ class proc_stream final : public special_handle {
             out.childfd = wr;
             out.fd = rd;
             SetHandleInformation(out.fd, HANDLE_FLAG_INHERIT, 0);
-            WriteFile(out.childfd, "This is a test", 14, NULL, NULL);
         }
 
         if (err.enabled) {
