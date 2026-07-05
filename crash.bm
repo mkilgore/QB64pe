@@ -1,0 +1,4 @@
+
+SUB baz
+    bar
+END SUB

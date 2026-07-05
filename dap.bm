@@ -1,0 +1,298 @@
+
+FUNCTION DapStartConnection&(dap As DapConnection, exe As String)
+    dap.dbg = _ShellStream("./internal/c/c_compiler/bin/lldb-dap.exe", _SHELL_STREAM_IN Or _SHELL_STREAM_OUT Or _SHELL_STREAM_ERROR)
+
+    dap.inStream = _OutStream(dap.dbg)
+    dap.OutStream = _InStream(dap.dbg)
+    dap.ErrStream = _ErrorStream(dap.dbg)
+
+    _LogInfo "Shell dbg handle: " + _ToStr$(dap.dbg) + ", inStream: " + _ToStr$(dap.inStream) + ", outStream: " + _ToStr$(dap.outStream)
+
+    dap.exe = exe
+
+    Dim j As Json
+
+    JsonInit j
+    args& = DapInitializeRequest&(j)
+    DapSendRequest dap, j, "initialize", args&
+    JsonClear j
+
+    ReDim res(0) As DapResponse
+    DO
+        IF DapPumpQueue&(dap, res(0)) THEN
+            _LogInfo "Dap connection queue response, command: " + res(0).Command
+            if res(0).Typ = DapTypeResponse AND res(0).Command = "initialize" THEN
+                _LogInfo "Dap connection initialize response, launching exe...!"
+                JsonInit j
+                DapSendRequest dap, j, "launch", DapLaunchRequest&(j, exe)
+                JsonClear j
+            ELSE
+                GOTO fail
+            END IF
+
+            EXIT DO
+        END IF
+        _LIMIT 120
+    LOOP
+
+    DO
+        IF DapPumpQueue&(dap, res(0)) THEN
+            IF res(0).Typ = DapTypeEvent AND res(0).Event = "initialized" THEN
+                _LogInfo "Dap connection initialied!"
+                EXIT DO
+            ELSEIF NOT res(0).HandledInternal THEN ' module and some other events can be sent during this time
+                _LogInfo "Dap connection failed! Event: " + res(0).Event + ", command: " + res(0).Command
+                GOTO fail
+            END IF
+        END IF
+        _LIMIT 120
+    LOOP
+
+    ' The first threads request just gives preliminary results, so we need to
+    ' send it early so that we can get correct results later
+    DapQueueThreads dap
+
+    DapStartConnection& = _TRUE
+    EXIT FUNCTION
+
+fail:
+    CLOSE #dap.dbg
+    dap.dbg = 0
+    DapStartConnection& = _FALSE
+END FUNCTION
+
+FUNCTION DapPumpQueue&(dap As DapConnection, res As DapResponse)
+    res.Typ = 0
+    res.HandledInternal = _FALSE
+    JsonClear res.j
+
+    __DapFillResponseBuffer dap
+
+    IF NOT __DapGetNextRequest&(dap.inputBuffer, res.j) THEN
+        EXIT FUNCTION
+    END IF
+
+    cmd$ = JsonQueryValue$(res.j, "command")
+    typ$ = JsonQueryValue$(res.j, "type")
+    event$ = JsonQueryValue$(res.j, "event")
+
+    IF typ$ = "response" THEN
+        res.Typ = DapTypeResponse
+        res.Command = cmd$
+        __DapHandleResponse dap, res
+
+        DapPumpQueue& = _TRUe
+    ELSEIF typ$ = "event" THEN
+        res.Typ = DapTypeEvent
+        res.Event = event$
+        __DapHandleEvent dap, res
+
+        DapPumpQueue& = _TRUe
+    ELSE
+        res.Typ = DapTypeUnknown
+        EXIT FUNCTION
+    END IF
+END FUNCTION
+
+SUB __DapHandleResponse (dap As DapConnection, res As DapResponse)
+    IF res.Command = "threads" THEN
+        res.HandledInternal = _TRUE
+
+        ' Fill in threads
+        arr& = JsonQuery&(res.j, "body.threads")
+        count& = JsonTokenTotalChildren&(res.j, arr&)
+        ReDim dap.threads(0 TO count& - 1) As DapThread
+
+        FOR cld = 0 TO count& - 1
+            child& = JsonTokenGetChild&(res.j, arr&, cld)
+            dap.threads(cld).id = JsonTokenGetValueInteger&&(res.j, JsonQueryFrom&(res.j, child&, "id"))
+            dap.threads(cld).nam = JsonQueryFromValue$(res.j, child&, "name")
+        NEXT
+    ELSEIF res.Command = "stackTrace" THEN
+        res.StackFrame.totalFrames = JsonTokenGetValueInteger&&(res.j, JsonQuery&(res.j, "body.totalFrames"))
+
+        frames& = JsonQuery&(res.j, "body.stackFrames")
+        frameCount& = JsonTokenTotalChildren&(res.j, frames&)
+
+        ReDim res.StackFrame.threadStackFrame(0 TO frameCount& - 1) As DapStackFrame
+
+        FOR cld = 0 TO frameCount& - 1
+            child& = JsonTokenGetChild&(res.j, frames&, cld)
+
+            res.StackFrame.threadStackFrame(cld).id = JsonTokenGetValueInteger&&(res.j, JsonQueryFrom&(res.j, child&, "id"))
+            res.StackFrame.threadStackFrame(cld).nam = JsonTokenGetValueStr$(res.j, JsonQueryFrom&(res.j, child&, "name"))
+            res.StackFrame.threadStackFrame(cld).source.nam = JsonTokenGetValueStr$(res.j, JsonQueryFrom&(res.j, child&, "source.name"))
+            res.StackFrame.threadStackFrame(cld).source.path = JsonTokenGetValueStr$(res.j, JsonQueryFrom&(res.j, child&, "source.path"))
+            res.StackFrame.threadStackFrame(cld).lin = JsonTokenGetValueInteger&&(res.j, JsonQueryFrom&(res.j, child&, "line"))
+            res.StackFrame.threadStackFrame(cld).column = JsonTokenGetValueInteger&&(res.j, JsonQueryFrom&(res.j, child&, "column"))
+            res.StackFrame.threadStackFrame(cld).endLine = JsonTokenGetValueInteger&&(res.j, JsonQueryFrom&(res.j, child&, "endLine"))
+            res.StackFrame.threadStackFrame(cld).endColumn = JsonTokenGetValueInteger&&(res.j, JsonQueryFrom&(res.j, child&, "endColumn"))
+        NEXT
+    END IF
+END SUB
+
+SUB __DapHandleEvent (dap As DapConnection, res As DapResponse)
+    IF res.Event = "stopped" THEN
+        res.HandledInternal = _TRUE
+        dap.processState = DapProcessStateStopped
+        dap.Stopped.reason = JsonQueryValue$(res.j, "body.reason")
+        dap.Stopped.description = JsonQueryValue$(res.j, "body.description")
+        dap.Stopped.threadId = JsonTokenGetValueInteger&&(res.j, JsonQuery&(res.j, "body.threadId"))
+    ELSEIF res.Event = "exited" THEN
+        res.HandledInternal = _TRUE
+        dap.processState = DapProcessStateExited
+        dap.ExitCode = JsonTokenGetValueInteger&&(res.j, JsonQuery&(res.j, "body.exitCode"))
+    ELSEIF res.Event = "terminated" THEN
+        res.HandledInternal = _TRUE
+        dap.processState = DapProcessStateTerminated
+    ELSEIF res.Event = "continued" THEN
+        res.HandledInternal = _TRUE
+        dap.processState = DapProcessStateCont
+    END IF
+
+    ' We functionally ignore these for now
+    IF res.Event = "module" OR res.Event = "output" THEN
+        res.HandledInternal = _TRUE
+    END IF
+END SUB
+
+SUB __DapFillResponseBuffer (dap As DapConnection)
+    get #dap.inStream, , s$
+
+    if s$ <> "" THEN
+        dap.inputBuffer = dap.inputBuffer + s$
+    END IF
+END SUB
+
+FUNCTION __DapGetNextRequest&(buffer As String, j As Json)
+    cutHeaders& = INSTR(buffer, _STR_CRLF + _STR_CRLF)
+
+    IF cutHeaders& = 0 THEN EXIT FUNCTION
+
+    ' Include the last _STR_CRLF to simplify the cutting
+    headers$ = LEFT$(buffer, cutHeaders& + 1)
+
+    contentLength& = 0
+
+    DO
+        splitHead& = INSTR(headers$, _STR_CRLF)
+        h$ = LEFT$(headers$, splitHead& - 1)
+
+        nam$ = LEFT$(h$, INSTR(h$, ":") - 1)
+        v$ = MID$(h$, INSTR(h$, ":") + 1)
+
+        if nam$ = "Content-Length" Then contentLength& = Val(v$)
+
+        headers$ = MID$(headers$, splitHead& + 2)
+    LOOP Until headers$ = "" OR contentLength& <> 0
+
+    if Len(buffer) < cutHeaders& + 3 + contentLength& THEN
+        Print "Buffer too short, buffer: "; len(buffer), "total: "; cutHeaders& + 3 + contentLength&
+        Exit Function
+    END IF
+
+    JsonStr$ = MID$(buffer, cutHeaders& + 4, contentLength&)
+
+    JsonInit j
+    errorCode& = JsonParse&(j, JsonStr$)
+
+    if errorCode& <> JSON_ERR_Success THEN Print "JsonParse error code:"; errorCode&
+
+    buffer = MID$(buffer, cutHeaders& + 4 + contentLength&)
+    __DapGetNextRequest& = _TRUE
+END FUNCTION
+
+SUB DapQueueThreads(dap As DapConnection)
+    Dim jres As Json
+    JsonInit jres
+    DapSendRequest dap, jres, "threads", 0
+    JsonClear jres
+END SUB
+
+SUB DapQueueStackTrace(dap As DapConnection, tid As Long)
+    Dim jres As Json
+    JsonInit jres
+    DapSendRequest dap, jres, "stackTrace", DapStacktraceRequest&(jres, tid)
+    JsonClear jres
+END SUB
+
+SUB DapQueueConfigurationDone(dap As DapConnection)
+    Dim jres As Json
+    JsonInit jres
+    DapSendRequest dap, jres, "configurationDone", 0
+    JsonClear jres
+
+    ' This triggers lldb-dap to start the process
+    dap.processState = DapProcessStateCont
+END SUB
+
+SUB DapSendRequest(dap As DapConnection, j As Json, cmd As String, args As Long)
+    STATIC seq
+    seq = seq + 1
+
+    rootObject& = JsonTokenCreateObject&(j)
+
+    JsonTokenObjectAdd j, rootObject&, JsonTokenCreateKey&(j, "command", JsonTokenCreateString&(j, cmd))
+    JsonTokenObjectAdd j, rootObject&, JsonTokenCreateKey&(j, "type", JsonTokenCreateString&(j, "request"))
+
+    IF args THEN JsonTokenObjectAdd j, rootObject&, JsonTokenCreateKey&(j, "arguments", args)
+    JsonTokenObjectAdd j, rootObject&, JsonTokenCreateKey&(j, "seq", JsonTokenCreateInteger&(j, seq))
+
+    JsonSetRootToken j, rootObject&
+
+    Dim s as String
+
+    s = JsonRender(j)
+
+    req$ = "Content-Length:" + str$(len(s)) + _STR_CRLF + _STR_CRLF + s
+
+    PUT dap.OutStream, , req$
+END SUB
+
+FUNCTION DapInitializeRequest&(j As Json)
+    argumentsObject& = JsonTokenCreateObject&(j)
+
+    JsonTokenObjectAdd j, argumentsObject&, JsonTokenCreateKey&(j, "adapterID", JsonTokenCreateString&(j, "lldb-dap"))
+    JsonTokenObjectAdd j, argumentsObject&, JsonTokenCreateKey&(j, "clientID", JsonTokenCreateString&(j, "qb64pe"))
+    JsonTokenObjectAdd j, argumentsObject&, JsonTokenCreateKey&(j, "linesStartAt1", JsonTokenCreateBool&(j, _TRUE))
+    JsonTokenObjectAdd j, argumentsObject&, JsonTokenCreateKey&(j, "columnsStartAt1", JsonTokenCreateBool&(j, _TRUE))
+    JsonTokenObjectAdd j, argumentsObject&, JsonTokenCreateKey&(j, "pathFormat", JsonTokenCreateString&(j, "path"))
+    JsonTokenObjectAdd j, argumentsObject&, JsonTokenCreateKey&(j, "supportsVariableType", JsonTokenCreateBool&(j, _TRUE))
+    JsonTokenObjectAdd j, argumentsObject&, JsonTokenCreateKey&(j, "supportsRunInTerminalRequest", JsonTokenCreateBool&(j, _TRUE))
+    JsonTokenObjectAdd j, argumentsObject&, JsonTokenCreateKey&(j, "locale", JsonTokenCreateString&(j, "en-us"))
+
+    DapInitializeRequest& = argumentsObject&
+END FUNCTION
+
+FUNCTION DapLaunchRequest&(j As Json, exe as string)
+    launchObject& = JsonTokenCreateObject&(j)
+
+    JsonTokenObjectAdd j, launchObject&, JsonTokenCreateKey&(j, "program", JsonTokenCreateString&(j, exe))
+    JsonTokenObjectAdd j, launchObject&, JsonTokenCreateKey&(j, "cwd", JsonTokenCreateString&(j, _StartDir$))
+    JsonTokenObjectAdd j, launchObject&, JsonTokenCreateKey&(j, "waitForDebugger", JsonTokenCreateBool&(j, _FALSE))
+    JsonTokenObjectAdd j, launchObject&, JsonTokenCreateKey&(j, "displayExtendedBacktrace", JsonTokenCreateBool&(j, _FALSE))
+
+    DapLaunchRequest& = launchObject&
+END FUNCTION
+
+FUNCTION DapStacktraceRequest&(j As Json, thread As Long)
+    stackTraceObject& = JsonTokenCreateObject&(j)
+
+    JsonTokenObjectAdd j, stackTraceObject&, JsonTokenCreateKey&(j, "threadId", JsonTokenCreateInteger&(j, thread))
+
+    DapStacktraceRequest& = stackTraceObject&
+END FUNCTION
+
+FUNCTION DapBreakpointRequest&(j As Json, src As String, func As String)
+    barr& = JsonTokenCreateArray&(j)
+
+    breakpoint& = JsonTokenCreateObject&(j)
+    JsonTokenObjectAdd j, breakpoint&, JsonTokenCreateKey&(j, "name", JsonTokenCreateString&(j, func))
+
+    JsonTokenArrayAdd j, barr&, breakpoint&
+
+    breakpointObject& = JsonTokenCreateObject&(j)
+    JsonTokenObjectAdd j, breakpointObject&, JsonTokenCreateKey&(j, "source", JsonTokenCreateString&(j, src))
+    JsonTokenObjectAdd j, breakpointObject&, JsonTokenCreateKey&(j, "breakpoints", barr&)
+    DapBreakpointRequest& = breakpointObject&
+END FUNCTION
