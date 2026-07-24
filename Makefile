@@ -232,7 +232,7 @@ endif
 # Linux and Mac OS need this to ensure symbols are kept in the symbol table in
 # the executable, which allows dladdr() to work for stacktrace resolution.
 ifeq ($(unix),y)
-ifeq ($(STRIP_SYMBOLS),n)
+ifneq ($(STRIP_SYMBOLS),n)
 	CXXLIBS += -rdynamic
 endif
 endif
